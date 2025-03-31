@@ -1,43 +1,54 @@
+// app/HomeScreen.tsx
 import React from 'react';
-import { View, Text, StyleSheet, FlatList } from 'react-native';
+import { View, StyleSheet, FlatList, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Link, useFocusEffect } from 'expo-router';
-import { getExpenses, getIncomes } from '../services/dbService';
+import { useRouter, useFocusEffect, Stack } from 'expo-router';
+import { getExpenses, getIncomes, deleteExpense, deleteIncome } from '../services/dbService';
 import { auth } from '../config/firebaseConfig';
+import {
+  Card,
+  Paragraph,
+  IconButton,
+  Text,
+  Divider,
+  Surface,
+} from 'react-native-paper';
 
 interface Transaction {
   id: string;
-  description: string;
   amount: number;
-  type: string;
+  description: string;
+  category?: string;
+  source?: string;
+  type: 'income' | 'expense';
+  date: string;
 }
 
 export default function HomeScreen() {
+  const [loading, setLoading] = React.useState(true);
   const [balance, setBalance] = React.useState(0);
-  const [totalExpenses, setTotalExpenses] = React.useState(0);
   const [transactions, setTransactions] = React.useState<Transaction[]>([]);
+  const router = useRouter();
 
   const fetchData = async () => {
-    const userId = auth.currentUser?.uid;
-    if (userId) {
-      try {
-        const expenses = await getExpenses(userId);
-        const incomes = await getIncomes(userId);
-
-        const totalIncome = incomes.reduce((sum, item) => sum + item.amount, 0);
-        const totalExpensesCalc = expenses.reduce((sum, item) => sum + item.amount, 0);
-        setBalance(totalIncome - totalExpensesCalc);
-        setTotalExpenses(totalExpensesCalc);
-
-        const allTransactions = [
-          ...incomes.map(item => ({ ...item, type: 'Receita' })),
-          ...expenses.map(item => ({ ...item, type: 'Despesa' }))
-        ].slice(0, 5); // Últimas 5 transações
-        setTransactions(allTransactions);
-      } catch (error) {
-        console.error('Erro ao buscar dados: ', error);
-      }
+    setLoading(true);
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+    try {
+      const exps = await getExpenses(uid);
+      const incs = await getIncomes(uid);
+      const processed: Transaction[] = [
+        ...incs.map(i => ({ ...i, type: 'income' as const })),
+        ...exps.map(e => ({ ...e, type: 'expense' as const })),
+      ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      const totalIn = incs.reduce((sum, i) => sum + i.amount, 0);
+      const totalEx = exps.reduce((sum, e) => sum + e.amount, 0);
+      setBalance(totalIn - totalEx);
+      setTransactions(processed);
+    } catch (error) {
+      console.error('Erro ao buscar dados:', error);
     }
+    setLoading(false);
   };
 
   useFocusEffect(
@@ -46,58 +57,129 @@ export default function HomeScreen() {
     }, [])
   );
 
+  const handleDelete = async (item: Transaction) => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+    if (item.type === 'income') await deleteIncome(uid, item.id);
+    else await deleteExpense(uid, item.id);
+    fetchData();
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.loader}>
+        <ActivityIndicator size="large" color="#fff" />
+      </View>
+    );
+  }
+
   return (
-    <LinearGradient colors={['#1D3D47', '#A1CEDC']} style={styles.container}>
-      <View style={styles.innerContainer}>
-        <Text style={styles.title}>Saldo do Mês</Text>
-        <Text style={[styles.balance, { color: balance >= 0 ? '#4caf50' : '#f44336' }]}>
-          R$ {balance.toFixed(2)}
+    <>
+      <Stack.Screen
+        options={{
+          headerStyle: { backgroundColor: '#1D3D47' },
+          headerTitle: 'Finanças',
+          headerLeft: () => null,
+        }}
+      />
+      <LinearGradient colors={['#1D3D47', '#A1CEDC']} style={styles.container}>
+        <Surface style={styles.balanceCard} elevation={4}>
+          <Text variant="headlineLarge" style={{ color: '#fff' }}>Saldo atual</Text>
+          <Text
+            variant="headlineSmall"
+            style={{ color: balance >= 0 ? '#2ECC71' : '#E74C3C', fontWeight: 'bold' }}
+          >
+            R$ {balance.toFixed(2)}
+          </Text>
+        </Surface>
+
+        <Text variant="titleMedium" style={styles.sectionTitle}>
+          Transações recentes
         </Text>
-        <Text style={styles.expensesText}>Total de Despesas: R$ {totalExpenses.toFixed(2)}</Text>
-        <Text style={styles.subtitle}>Últimas Transações</Text>
+
         <FlatList
           data={transactions}
-          keyExtractor={(item) => item.id} // Chave única
+          keyExtractor={item => item.id}
+          contentContainerStyle={styles.listContent}
           renderItem={({ item }) => (
-            <View style={styles.transactionItem}>
-              <Text style={styles.transactionText}>{item.type}: {item.description}</Text>
-              <Text style={[styles.transactionAmount, { color: item.type === 'Receita' ? '#4caf50' : '#f44336' }]}>
-                R$ {item.amount.toFixed(2)}
-              </Text>
-            </View>
+            <Card style={styles.card} mode="outlined">
+              <Card.Content style={styles.cardContent}>
+                <View>
+                  <Paragraph style={styles.description}>
+                    {item.type === 'income' ? item.source : item.category}
+                  </Paragraph>
+                  <Text style={styles.dateText}>{new Date(item.date).toLocaleDateString()}</Text>
+                </View>
+                <View style={styles.amountDelete}>
+                  <Text
+                    variant="titleMedium"
+                    style={{ color: item.type === 'income' ? '#2ECC71' : '#E74C3C' }}
+                  >
+                    {item.type === 'income' ? '+' : '-'} R$ {item.amount.toFixed(2)}
+                  </Text>
+                  <IconButton
+                    icon="delete"
+                    size={20}
+                    onPress={() => handleDelete(item)}
+                    accessibilityLabel="Excluir transação"
+                  />
+                </View>
+              </Card.Content>
+            </Card>
           )}
         />
-        <View style={styles.buttonContainer}>
-          <Link href="/ExpenseForm" style={styles.navigationButton}>
-            <Text style={styles.navigationButtonText}>Adicionar Despesa</Text>
-          </Link>
-          <Link href="/IncomeForm" style={styles.navigationButton}>
-            <Text style={styles.navigationButtonText}>Adicionar Receita</Text>
-          </Link>
+
+        {/* Floating Action Buttons */}
+        <View style={styles.fabContainer}>
+          <IconButton
+            icon="plus"
+            size={28}
+            onPress={() => router.push('/IncomeForm')}
+            style={[styles.fab, styles.incomeFab]}
+            accessibilityLabel="Adicionar receita"
+          />
+          <IconButton
+            icon="minus"
+            size={28}
+            onPress={() => router.push('/ExpenseForm')}
+            style={[styles.fab, styles.expenseFab]}
+            accessibilityLabel="Adicionar despesa"
+          />
         </View>
-      </View>
-    </LinearGradient>
+      </LinearGradient>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  innerContainer: { flex: 1, padding: 20 },
-  title: { fontSize: 24, fontWeight: 'bold', color: '#fff', textAlign: 'center', marginBottom: 10 },
-  balance: { fontSize: 36, fontWeight: 'bold', textAlign: 'center', marginBottom: 10 },
-  expensesText: { fontSize: 18, color: '#fff', textAlign: 'center', marginBottom: 20 },
-  subtitle: { fontSize: 18, color: '#fff', marginBottom: 10 },
-  transactionItem: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderColor: '#ccc' },
-  transactionText: { color: '#fff', fontSize: 16 },
-  transactionAmount: { fontSize: 16, fontWeight: 'bold' },
-  buttonContainer: { flexDirection: 'row', marginTop: 20 },
-  navigationButton: { 
-    backgroundColor: '#fff', 
-    borderRadius: 8, 
-    paddingVertical: 14, 
-    alignItems: 'center', 
-    flex: 1, 
-    marginHorizontal: 5 
+  loader: { flex: 1, justifyContent: 'center', backgroundColor: '#1D3D47' },
+  balanceCard: {
+    margin: 16,
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: '#174E61', // alterado de branco para azul escuro
+    alignItems: 'center',
   },
-  navigationButtonText: { color: '#1D3D47', fontSize: 18, fontWeight: '600' },
+  sectionTitle: { color: '#fff', marginHorizontal: 16, marginTop: 8 },
+  listContent: { paddingHorizontal: 16, paddingBottom: 100 },
+  card: { marginVertical: 6 },
+  cardContent: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  description: { fontSize: 16, fontWeight: '600' },
+  dateText: { fontSize: 12, color: '#555' },
+  amountDelete: { flexDirection: 'row', alignItems: 'center' },
+  fabContainer: { position: 'absolute', bottom: 24, right: 24, alignItems: 'flex-end' },
+  fab: {
+    backgroundColor: '#fff',
+    elevation: 4,
+    marginVertical: 6,
+  },
+  incomeFab: {
+    borderColor: '#2ECC71',
+    borderWidth: 2,
+  },
+  expenseFab: {
+    borderColor: '#E74C3C',
+    borderWidth: 2,
+  },
 });

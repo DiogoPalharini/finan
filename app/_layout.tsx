@@ -1,18 +1,13 @@
 import { Stack } from 'expo-router';
-import HomeScreen from './HomeScreen';
-import ExpenseForm from './ExpenseForm';
-import IncomeForm from './IncomeForm';
-import SignUpScreen from './SignUpScreen';
-import Login from './login';
 
 export default function Layout() {
   return (
     <Stack>
-      <Stack.Screen name="login" component={Login} options={{ headerShown: false }} />
-      <Stack.Screen name="signup" component={SignUpScreen} />
-      <Stack.Screen name="home" component={HomeScreen} />
-      <Stack.Screen name="expense" component={ExpenseForm} />
-      <Stack.Screen name="income" component={IncomeForm} />
+      <Stack.Screen name="signup" />
+      <Stack.Screen name="home" />
+      <Stack.Screen name="expense" />
+      <Stack.Screen name="income" />
+      <Stack.Screen name="charts" /> {/* Nova tela de gráficos */}
     </Stack>
   );
 }

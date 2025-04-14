@@ -1,3 +1,5 @@
+
+
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -13,6 +15,7 @@ export default function LoginScreen() {
   const handleLogin = async () => {
     try {
       await signInWithEmailAndPassword(auth, email, password);
+      // Redireciona para a rota "home", que deve estar definida em app/home.tsx
       router.push('/HomeScreen');
     } catch (error: any) {
       Alert.alert('Erro', error.message);
@@ -56,14 +59,61 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  innerContainer: { flex: 1, justifyContent: 'center', paddingHorizontal: 32 },
-  title: { fontSize: 36, fontWeight: 'bold', color: '#fff', textAlign: 'center', marginBottom: 10 },
-  subtitle: { fontSize: 18, color: '#fff', textAlign: 'center', marginBottom: 30 },
-  input: { height: 50, backgroundColor: 'rgba(255, 255, 255, 0.2)', borderRadius: 8, paddingHorizontal: 16, color: '#fff', marginBottom: 20, fontSize: 16 },
-  button: { backgroundColor: '#fff', borderRadius: 8, paddingVertical: 14, alignItems: 'center', marginBottom: 20 },
-  buttonText: { color: '#1D3D47', fontSize: 18, fontWeight: 'bold' },
-  footer: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
-  footerText: { color: '#fff', fontSize: 16 },
-  footerLinkText: { color: '#fff', fontSize: 16, textDecorationLine: 'underline', marginLeft: 5 },
+  container: { 
+    flex: 1 
+  },
+  innerContainer: { 
+    flex: 1, 
+    justifyContent: 'center', 
+    paddingHorizontal: 32 
+  },
+  title: { 
+    fontSize: 36, 
+    fontWeight: 'bold', 
+    color: '#fff', 
+    textAlign: 'center', 
+    marginBottom: 10 
+  },
+  subtitle: { 
+    fontSize: 18, 
+    color: '#fff', 
+    textAlign: 'center', 
+    marginBottom: 30 
+  },
+  input: { 
+    height: 50, 
+    backgroundColor: 'rgba(255, 255, 255, 0.2)', 
+    borderRadius: 8, 
+    paddingHorizontal: 16, 
+    color: '#fff', 
+    marginBottom: 20, 
+    fontSize: 16 
+  },
+  button: { 
+    backgroundColor: '#fff', 
+    borderRadius: 8, 
+    paddingVertical: 14, 
+    alignItems: 'center', 
+    marginBottom: 20 
+  },
+  buttonText: { 
+    color: '#1D3D47', 
+    fontSize: 18, 
+    fontWeight: 'bold' 
+  },
+  footer: { 
+    flexDirection: 'row', 
+    justifyContent: 'center', 
+    alignItems: 'center' 
+  },
+  footerText: { 
+    color: '#fff', 
+    fontSize: 16 
+  },
+  footerLinkText: { 
+    color: '#fff', 
+    fontSize: 16, 
+    textDecorationLine: 'underline', 
+    marginLeft: 5 
+  },
 });

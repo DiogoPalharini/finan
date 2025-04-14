@@ -2,8 +2,8 @@ import React from 'react';
 import { View, Text, StyleSheet, FlatList } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Link, useFocusEffect } from 'expo-router';
-import { getExpenses, getIncomes } from '../services/dbService';
-import { auth } from '../config/firebaseConfig';
+import { getExpenses, getIncomes } from '../services/dbService'; // Ajuste o caminho conforme necessário
+import { auth } from '../config/firebaseConfig'; // Ajuste o caminho conforme necessário
 
 interface Transaction {
   id: string;
@@ -31,7 +31,7 @@ export default function HomeScreen() {
 
         const allTransactions = [
           ...incomes.map(item => ({ ...item, type: 'Receita' })),
-          ...expenses.map(item => ({ ...item, type: 'Despesa' }))
+          ...expenses.map(item => ({ ...item, type: 'Despesa' })),
         ].slice(0, 5); // Últimas 5 transações
         setTransactions(allTransactions);
       } catch (error) {
@@ -73,6 +73,9 @@ export default function HomeScreen() {
           </Link>
           <Link href="/IncomeForm" style={styles.navigationButton}>
             <Text style={styles.navigationButtonText}>Adicionar Receita</Text>
+          </Link>
+          <Link href="/charts" style={styles.navigationButton}>
+            <Text style={styles.navigationButtonText}>Ver Gráficos</Text>
           </Link>
         </View>
       </View>

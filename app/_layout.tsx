@@ -53,7 +53,7 @@ export default function RootLayout() {
               <Drawer.Item
                 label="Home"
                 icon="home"
-                onPress={() => navigateTo('/home')}
+                onPress={() => navigateTo('/HomeScreen')}
                 style={styles.drawerItem}
               />
               <Drawer.Item
@@ -78,6 +78,13 @@ export default function RootLayout() {
                 onPress={() => navigateTo('/goals')}
                 style={styles.drawerItem}
               />
+              <Drawer.Item
+                  label="Relatório Mensal"
+                  icon="file-document-outline"
+                  onPress={() => navigateTo('/monthlyReport')}
+                  style={styles.drawerItem}
+              />
+
               <View style={styles.spacer} />
               <Divider style={styles.divider} />
               <Drawer.Item

@@ -1,4 +1,3 @@
-// app/graphs.tsx
 import React from 'react';
 import {
   View,
@@ -23,7 +22,7 @@ interface Expense {
 export default function GraphsScreen() {
   const [loading, setLoading] = React.useState(true);
   const [pieData, setPieData] = React.useState<
-    { name: string; amount: number; color: string; legendFontColor: string; legendFontSize: number }[]
+    { name: string; amount: number; color: string }[]
   >([]);
   const [barData, setBarData] = React.useState<{ labels: string[]; datasets: { data: number[] }[] }>({
     labels: [],
@@ -56,8 +55,6 @@ export default function GraphsScreen() {
         name: category.length > 12 ? `${category.slice(0, 10)}...` : category,
         amount,
         color: COLORS[i % COLORS.length],
-        legendFontColor: '#333',
-        legendFontSize: 12,
       }));
       setPieData(pie);
 
@@ -120,16 +117,27 @@ export default function GraphsScreen() {
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Despesas por Categoria</Text>
         {pieData.length > 0 ? (
-          <PieChart
-            data={pieData}
-            width={screenWidth - 40}
-            height={200}
-            chartConfig={chartConfig}
-            accessor="amount"
-            backgroundColor="transparent"
-            paddingLeft="0"
-            absolute
-          />
+          <>
+            <PieChart
+              data={pieData}
+              width={screenWidth - 40}
+              height={200}
+              chartConfig={chartConfig}
+              accessor="amount"
+              backgroundColor="transparent"
+              paddingLeft="0"
+              absolute
+              hasLegend={false} // Remove legenda lateral
+            />
+            <View style={styles.legendContainer}>
+              {pieData.map((item, i) => (
+                <View key={i} style={styles.legendItem}>
+                  <View style={[styles.legendColor, { backgroundColor: item.color }]} />
+                  <Text style={styles.legendText}>{item.name}</Text>
+                </View>
+              ))}
+            </View>
+          </>
         ) : (
           <Text style={styles.noData}>Nenhuma despesa registrada.</Text>
         )}
@@ -204,5 +212,27 @@ const styles = StyleSheet.create({
   barChart: {
     marginRight: 20,
     paddingBottom: 10,
+  },
+  legendContainer: {
+    marginTop: 16,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 8,
+    marginVertical: 4,
+  },
+  legendColor: {
+    width: 14,
+    height: 14,
+    marginRight: 6,
+    borderRadius: 3,
+  },
+  legendText: {
+    fontSize: 13,
+    color: '#444',
   },
 });

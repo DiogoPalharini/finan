@@ -1,25 +1,35 @@
+// app/createBudget.tsx
 import React, { useState } from 'react';
-import { View, StyleSheet, TextInput, Alert } from 'react-native';
-import { Text, Button, HelperText } from 'react-native-paper';
+import { View, StyleSheet, Alert } from 'react-native';
+import { TextInput, HelperText, Text, Button, Menu, Provider as PaperProvider } from 'react-native-paper';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { ref, push } from 'firebase/database';
 import { auth, rtdb } from '../config/firebaseConfig';
 
-const predefinedCategories = [
-  'Alimentação', 'Transporte', 'Moradia', 'Educação', 'Lazer',
-  'Saúde', 'Compras', 'Investimentos', 'Outros'
+const expenseCategories = [
+  'Alimentação',
+  'Transporte',
+  'Moradia',
+  'Educação',
+  'Lazer',
+  'Saúde',
+  'Roupas',
+  'Contas e Serviços',
+  'Viagens',
+  'Outros',
 ];
 
 export default function CreateBudget() {
   const [category, setCategory] = useState('');
   const [limit, setLimit] = useState('');
+  const [menuVisible, setMenuVisible] = useState(false);
   const router = useRouter();
   const userId = auth.currentUser?.uid!;
 
   const handleSave = async () => {
     if (!category || !limit) {
-      Alert.alert('Erro', 'Preencha todos os campos.');
+      Alert.alert('Erro', 'Selecione a categoria e preencha o limite.');
       return;
     }
 
@@ -45,70 +55,67 @@ export default function CreateBudget() {
   };
 
   return (
-    <LinearGradient colors={['#1D3D47', '#A1CEDC']} style={styles.container}>
-      <View style={styles.inner}>
-        <Text style={styles.title}>Novo Orçamento</Text>
-        <TextInput
-          placeholder="Categoria (ex: Alimentação)"
-          placeholderTextColor="#ccc"
-          value={category}
-          onChangeText={setCategory}
-          style={styles.input}
-        />
-        <HelperText type="info">
-          Dica: use uma categoria como {predefinedCategories.join(', ')}.
-        </HelperText>
+    <PaperProvider>
+      <LinearGradient colors={['#1D3D47', '#A1CEDC']} style={styles.container}>
+        <View style={styles.inner}>
+          <Text style={styles.title}>Novo Orçamento</Text>
 
-        <TextInput
-          placeholder="Limite (R$)"
-          placeholderTextColor="#ccc"
-          keyboardType="numeric"
-          value={limit}
-          onChangeText={setLimit}
-          style={styles.input}
-        />
+          <View style={styles.menuWrapper}>
+            <Menu
+              visible={menuVisible}
+              onDismiss={() => setMenuVisible(false)}
+              anchor={
+                <Button
+                  mode="outlined"
+                  onPress={() => setMenuVisible(true)}
+                  style={styles.menuButton}
+                  labelStyle={styles.menuLabel}
+                >
+                  {category || 'Selecione Categoria'}
+                </Button>
+              }
+            >
+              {expenseCategories.map((cat) => (
+                <Menu.Item
+                  key={cat}
+                  onPress={() => { setCategory(cat); setMenuVisible(false); }}
+                  title={cat}
+                />
+              ))}
+            </Menu>
+            <HelperText type="info">
+              Escolha uma das categorias padrões.
+            </HelperText>
+          </View>
 
-        <Button mode="contained" onPress={handleSave} style={styles.button} labelStyle={styles.buttonLabel}>
-          Salvar
-        </Button>
-      </View>
-    </LinearGradient>
+          <TextInput
+            label="Limite (R$)"
+            mode="outlined"
+            placeholder="0.00"
+            keyboardType="numeric"
+            value={limit}
+            onChangeText={setLimit}
+            style={styles.input}
+          />
+
+          <Button mode="contained" onPress={handleSave} style={styles.button} labelStyle={styles.buttonLabel}>
+            Salvar Orçamento
+          </Button>
+        </View>
+      </LinearGradient>
+    </PaperProvider>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  inner: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingHorizontal: 32,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 24,
-    textAlign: 'center',
-  },
-  input: {
-    height: 50,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    color: '#fff',
-    marginBottom: 16,
-    fontSize: 16,
-  },
-  button: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    marginTop: 16,
-  },
-  buttonLabel: {
-    color: '#1D3D47',
-    fontSize: 18,
-    fontWeight: '600',
-  },
+  container: { flex: 1 },
+  inner: { flex: 1, justifyContent: 'center', paddingHorizontal: 32 },
+  title: { fontSize: 28, fontWeight: 'bold', color: '#fff', marginBottom: 24, textAlign: 'center' },
+  menuWrapper: { marginBottom: 16 },
+  menuButton: { borderColor: '#fff', backgroundColor: 'rgba(255,255,255,0.15)' },
+  menuLabel: { color: '#fff' },
+  input: { backgroundColor: 'rgba(255,255,255,0.15)', marginBottom: 24 },
+  button: { backgroundColor: '#fff', borderRadius: 8, paddingVertical: 8 },
+  buttonLabel: { color: '#1D3D47', fontSize: 18, fontWeight: '600' },
 });
+

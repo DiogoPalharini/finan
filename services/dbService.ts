@@ -47,3 +47,28 @@ export async function deleteIncome(userId: string, incomeId: string) {
   const itemRef = ref(rtdb, `users/${userId}/incomes/${incomeId}`);
   await remove(itemRef);
 }
+
+export async function getTotalIncomeByCategory(
+  userId: string
+): Promise<Record<string, number>> {
+  const incomes = await getIncomes(userId);
+  const totals: Record<string, number> = {};
+  incomes.forEach(({ source, amount }) => {
+    totals[source] = (totals[source] || 0) + amount;
+  });
+  return totals;
+}
+
+/**
+ * Retorna o total de despesas por categoria do usuário
+ */
+export async function getTotalExpensesByCategory(
+  userId: string
+): Promise<Record<string, number>> {
+  const expenses = await getExpenses(userId);
+  const totals: Record<string, number> = {};
+  expenses.forEach(({ category, amount }) => {
+    totals[category] = (totals[category] || 0) + amount;
+  });
+  return totals;
+}

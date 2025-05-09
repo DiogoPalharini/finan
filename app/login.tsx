@@ -1,14 +1,19 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import {
+  View, Text, TextInput, TouchableOpacity,
+  StyleSheet, Alert, KeyboardAvoidingView,
+  Platform, TouchableWithoutFeedback, Keyboard
+} from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../config/firebaseConfig';
 
 export default function LoginScreen() {
+  const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const router = useRouter();
 
   const handleLogin = async () => {
     try {
@@ -20,50 +25,133 @@ export default function LoginScreen() {
   };
 
   return (
-    <LinearGradient colors={['#1D3D47', '#A1CEDC']} style={styles.container}>
-      <View style={styles.innerContainer}>
-        <Text style={styles.title}>Bem-vindo</Text>
-        <Text style={styles.subtitle}>Acesse sua conta</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Email"
-          placeholderTextColor="#ccc"
-          autoCapitalize="none"
-          keyboardType="email-address"
-          value={email}
-          onChangeText={setEmail}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Senha"
-          placeholderTextColor="#ccc"
-          secureTextEntry
-          value={password}
-          onChangeText={setPassword}
-        />
-        <TouchableOpacity style={styles.button} onPress={handleLogin}>
-          <Text style={styles.buttonText}>Logar</Text>
-        </TouchableOpacity>
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>Não tem conta?</Text>
-          <TouchableOpacity onPress={() => router.push('/SignUpScreen')}>
-            <Text style={styles.footerLinkText}>Cadastre-se</Text>
-          </TouchableOpacity>
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
+        <Text style={styles.title}>Bem-vindo de volta</Text>
+        <Text style={styles.subtitle}>Faça login para continuar</Text>
+
+        <View style={styles.inputContainer}>
+          <Ionicons name="mail-outline" size={20} color="#66FCF1" style={styles.inputIcon} />
+          <TextInput
+            style={styles.input}
+            placeholder="E-mail"
+            placeholderTextColor="#AAAAAA"
+            value={email}
+            onChangeText={setEmail}
+            keyboardType="email-address"
+            autoCapitalize="none"
+          />
         </View>
-      </View>
-    </LinearGradient>
+
+        <View style={styles.inputContainer}>
+          <Ionicons name="lock-closed-outline" size={20} color="#66FCF1" style={styles.inputIcon} />
+          <TextInput
+            style={styles.input}
+            placeholder="Senha"
+            placeholderTextColor="#AAAAAA"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+          />
+        </View>
+
+        <TouchableOpacity
+          onPress={handleLogin}
+          activeOpacity={0.8}
+          style={styles.buttonContainer}
+        >
+          <LinearGradient
+            colors={['#66FCF1', '#45A29E']}
+            style={styles.button}
+          >
+            <Text style={styles.buttonText}>Entrar</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={() => router.push('/SignUpScreen')}
+          style={styles.linkContainer}
+        >
+          <Text style={styles.linkText}>
+            Ainda não tem conta? <Text style={styles.linkHighlight}>Cadastre-se</Text>
+          </Text>
+        </TouchableOpacity>
+      </KeyboardAvoidingView>
+    </TouchableWithoutFeedback>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  innerContainer: { flex: 1, justifyContent: 'center', paddingHorizontal: 32 },
-  title: { fontSize: 36, fontWeight: 'bold', color: '#fff', textAlign: 'center', marginBottom: 10 },
-  subtitle: { fontSize: 18, color: '#fff', textAlign: 'center', marginBottom: 30 },
-  input: { height: 50, backgroundColor: 'rgba(255, 255, 255, 0.2)', borderRadius: 8, paddingHorizontal: 16, color: '#fff', marginBottom: 20, fontSize: 16 },
-  button: { backgroundColor: '#fff', borderRadius: 8, paddingVertical: 14, alignItems: 'center', marginBottom: 20 },
-  buttonText: { color: '#1D3D47', fontSize: 18, fontWeight: 'bold' },
-  footer: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
-  footerText: { color: '#fff', fontSize: 16 },
-  footerLinkText: { color: '#fff', fontSize: 16, textDecorationLine: 'underline', marginLeft: 5 },
+  container: {
+    flex: 1,
+    backgroundColor: '#0D1117',
+    padding: 16,
+    justifyContent: 'center',
+  },
+  title: {
+    fontSize: 32,
+    color: '#66FCF1',
+    fontWeight: 'bold',
+    fontFamily: 'Poppins_700Bold',
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#C5C6C7',
+    fontFamily: 'Poppins_400Regular',
+    marginBottom: 24,
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1F2833',
+    borderRadius: 8,
+    marginBottom: 16,
+    paddingHorizontal: 12,
+  },
+  inputIcon: {
+    marginRight: 8,
+  },
+  input: {
+    flex: 1,
+    color: '#F1F1F1',
+    fontFamily: 'Poppins_400Regular',
+    paddingVertical: 12,
+    fontSize: 16,
+  },
+  buttonContainer: {
+    marginTop: 16,
+  },
+  button: {
+    borderRadius: 25,
+    paddingVertical: 14,
+    alignItems: 'center',
+    shadowColor: '#66FCF1',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  buttonText: {
+    color: '#0D1117',
+    fontSize: 18,
+    fontWeight: 'bold',
+    fontFamily: 'Poppins_700Bold',
+  },
+  linkContainer: {
+    marginTop: 20,
+  },
+  linkText: {
+    color: '#C5C6C7',
+    fontSize: 14,
+    textAlign: 'center',
+    fontFamily: 'Poppins_400Regular',
+  },
+  linkHighlight: {
+    color: '#66FCF1',
+    fontWeight: 'bold',
+  },
 });

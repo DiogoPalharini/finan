@@ -1,185 +1,232 @@
-// app/HomeScreen.tsx
 import React from 'react';
-import { View, StyleSheet, FlatList, ActivityIndicator } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter, useFocusEffect, Stack } from 'expo-router';
-import { getExpenses, getIncomes, deleteExpense, deleteIncome } from '../services/dbService';
-import { auth } from '../config/firebaseConfig';
 import {
-  Card,
-  Paragraph,
-  IconButton,
-  Text,
-  Divider,
-  Surface,
-} from 'react-native-paper';
+  View, Text, TouchableOpacity,
+  StyleSheet, ScrollView
+} from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 
-interface Transaction {
-  id: string;
-  amount: number;
-  description: string;
-  category?: string;
-  source?: string;
-  type: 'income' | 'expense';
-  date: string;
-}
+const transactions = [
+  { id: '1', type: 'income', description: 'Salário', amount: 5000, date: '10/05/2025' },
+  { id: '2', type: 'expense', description: 'Aluguel', amount: 1500, date: '09/05/2025' },
+  { id: '3', type: 'expense', description: 'Supermercado', amount: 250, date: '08/05/2025' },
+  // ... outros itens
+];
 
 export default function HomeScreen() {
-  const [loading, setLoading] = React.useState(true);
-  const [balance, setBalance] = React.useState(0);
-  const [transactions, setTransactions] = React.useState<Transaction[]>([]);
   const router = useRouter();
-
-  const fetchData = async () => {
-    setLoading(true);
-    const uid = auth.currentUser?.uid;
-    if (!uid) return;
-    try {
-      const exps = await getExpenses(uid);
-      const incs = await getIncomes(uid);
-      const processed: Transaction[] = [
-        ...incs.map(i => ({ ...i, type: 'income' as const })),
-        ...exps.map(e => ({ ...e, type: 'expense' as const })),
-      ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-      const totalIn = incs.reduce((sum, i) => sum + i.amount, 0);
-      const totalEx = exps.reduce((sum, e) => sum + e.amount, 0);
-      setBalance(totalIn - totalEx);
-      setTransactions(processed);
-    } catch (error) {
-      console.error('Erro ao buscar dados:', error);
-    }
-    setLoading(false);
-  };
-
-  useFocusEffect(
-    React.useCallback(() => {
-      fetchData();
-    }, [])
-  );
-
-  const handleDelete = async (item: Transaction) => {
-    const uid = auth.currentUser?.uid;
-    if (!uid) return;
-    if (item.type === 'income') await deleteIncome(uid, item.id);
-    else await deleteExpense(uid, item.id);
-    fetchData();
-  };
-
-  if (loading) {
-    return (
-      <View style={styles.loader}>
-        <ActivityIndicator size="large" color="#fff" />
-      </View>
-    );
-  }
+  const totalIncome = transactions
+    .filter(t => t.type === 'income')
+    .reduce((sum, t) => sum + t.amount, 0);
+  const totalExpense = transactions
+    .filter(t => t.type === 'expense')
+    .reduce((sum, t) => sum + t.amount, 0);
+  const balance = totalIncome - totalExpense;
 
   return (
-    <>
-      <Stack.Screen
-        options={{
-          headerStyle: { backgroundColor: '#1D3D47' },
-          headerTitle: 'Finanças',
-          headerLeft: () => null,
-        }}
-      />
-      <LinearGradient colors={['#1D3D47', '#A1CEDC']} style={styles.container}>
-        <Surface style={styles.balanceCard} elevation={4}>
-          <Text variant="headlineLarge" style={{ color: '#fff' }}>Saldo atual</Text>
-          <Text
-            variant="headlineSmall"
-            style={{ color: balance >= 0 ? '#2ECC71' : '#E74C3C', fontWeight: 'bold' }}
-          >
-            R$ {balance.toFixed(2)}
-          </Text>
-        </Surface>
+    <View style={styles.container}>
+      <Text style={styles.greeting}>Olá, Usuário</Text>
 
-        <Text variant="titleMedium" style={styles.sectionTitle}>
-          Transações recentes
-        </Text>
+      <View style={styles.balanceCard}>
+        <Text style={styles.balanceLabel}>Saldo Atual</Text>
+        <Text style={styles.balanceAmount}>R$ {balance},00</Text>
+      </View>
 
-        <FlatList
-          data={transactions}
-          keyExtractor={item => item.id}
-          contentContainerStyle={styles.listContent}
-          renderItem={({ item }) => (
-            <Card style={styles.card} mode="outlined">
-              <Card.Content style={styles.cardContent}>
-                <View>
-                  <Paragraph style={styles.description}>
-                    {item.type === 'income' ? item.source : item.category}
-                  </Paragraph>
-                  <Text style={styles.dateText}>{new Date(item.date).toLocaleDateString()}</Text>
-                </View>
-                <View style={styles.amountDelete}>
-                  <Text
-                    variant="titleMedium"
-                    style={{ color: item.type === 'income' ? '#2ECC71' : '#E74C3C' }}
-                  >
-                    {item.type === 'income' ? '+' : '-'} R$ {item.amount.toFixed(2)}
-                  </Text>
-                  <IconButton
-                    icon="delete"
-                    size={20}
-                    onPress={() => handleDelete(item)}
-                    accessibilityLabel="Excluir transação"
-                  />
-                </View>
-              </Card.Content>
-            </Card>
-          )}
-        />
-
-        {/* Floating Action Buttons */}
-        <View style={styles.fabContainer}>
-          <IconButton
-            icon="plus"
-            size={28}
-            onPress={() => router.push('/IncomeForm')}
-            style={[styles.fab, styles.incomeFab]}
-            accessibilityLabel="Adicionar receita"
-          />
-          <IconButton
-            icon="minus"
-            size={28}
-            onPress={() => router.push('/ExpenseForm')}
-            style={[styles.fab, styles.expenseFab]}
-            accessibilityLabel="Adicionar despesa"
-          />
+      <View style={styles.summaryContainer}>
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryTitle}>Receitas</Text>
+          <Text style={styles.summaryAmount}>R$ {totalIncome},00</Text>
         </View>
-      </LinearGradient>
-    </>
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryTitle}>Despesas</Text>
+          <Text style={styles.summaryAmount}>R$ {totalExpense},00</Text>
+        </View>
+      </View>
+
+      <View style={styles.actionContainer}>
+        <TouchableOpacity
+          onPress={() => router.push('/IncomeForm')}
+          activeOpacity={0.8}
+        >
+          <LinearGradient
+            colors={['#66FCF1', '#45A29E']}
+            style={styles.actionButton}
+          >
+            <Ionicons name="add-circle-outline" size={24} color="#0D1117" />
+            <Text style={styles.actionText}>Nova Receita</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={() => router.push('/ExpenseForm')}
+          activeOpacity={0.8}
+        >
+          <LinearGradient
+            colors={['#66FCF1', '#45A29E']}
+            style={styles.actionButton}
+          >
+            <Ionicons name="remove-circle-outline" size={24} color="#0D1117" />
+            <Text style={styles.actionText}>Nova Despesa</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+      </View>
+
+      <Text style={styles.sectionTitle}>Últimas Transações</Text>
+
+      <ScrollView style={styles.transactionList}>
+        {transactions.map(item => (
+          <View key={item.id} style={styles.transactionItem}>
+            <Ionicons
+              name={item.type === 'income' ? "arrow-up-circle" : "arrow-down-circle"}
+              size={24}
+              color={item.type === 'income' ? '#00FFAB' : '#FF5484'}
+              style={styles.transactionIcon}
+            />
+            <View style={styles.transactionDetails}>
+              <Text style={styles.transactionDescription}>
+                {item.description}
+              </Text>
+              <Text style={styles.transactionDate}>{item.date}</Text>
+            </View>
+            <Text
+              style={[
+                styles.transactionAmount,
+                { color: item.type === 'income' ? '#00FFAB' : '#FF5484' }
+              ]}
+            >
+              {item.type === 'income' ? '+' : '-'} R$ {item.amount},00
+            </Text>
+          </View>
+        ))}
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  loader: { flex: 1, justifyContent: 'center', backgroundColor: '#1D3D47' },
-  balanceCard: {
-    margin: 16,
+  container: {
+    flex: 1,
+    backgroundColor: '#0D1117',
     padding: 16,
+  },
+  greeting: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#66FCF1',
+    fontFamily: 'Poppins_700Bold',
+    marginBottom: 16,
+  },
+  balanceCard: {
+    backgroundColor: '#1F2833',
     borderRadius: 12,
-    backgroundColor: '#174E61', // alterado de branco para azul escuro
+    padding: 16,
+    marginBottom: 16,
+    alignItems: 'center',
+    shadowColor: '#66FCF1',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  balanceLabel: {
+    fontSize: 14,
+    color: '#C5C6C7',
+    fontFamily: 'Poppins_400Regular',
+  },
+  balanceAmount: {
+    fontSize: 32,
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    fontFamily: 'Poppins_700Bold',
+    marginTop: 4,
+  },
+  summaryContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  summaryCard: {
+    backgroundColor: '#1F2833',
+    borderRadius: 12,
+    flex: 1,
+    padding: 16,
+    marginHorizontal: 4,
     alignItems: 'center',
   },
-  sectionTitle: { color: '#fff', marginHorizontal: 16, marginTop: 8 },
-  listContent: { paddingHorizontal: 16, paddingBottom: 100 },
-  card: { marginVertical: 6 },
-  cardContent: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  description: { fontSize: 16, fontWeight: '600' },
-  dateText: { fontSize: 12, color: '#555' },
-  amountDelete: { flexDirection: 'row', alignItems: 'center' },
-  fabContainer: { position: 'absolute', bottom: 24, right: 24, alignItems: 'flex-end' },
-  fab: {
-    backgroundColor: '#fff',
+  summaryTitle: {
+    fontSize: 14,
+    color: '#C5C6C7',
+    fontFamily: 'Poppins_400Regular',
+  },
+  summaryAmount: {
+    fontSize: 20,
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    fontFamily: 'Poppins_600SemiBold',
+    marginTop: 4,
+  },
+  actionContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 25,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    shadowColor: '#66FCF1',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
     elevation: 4,
-    marginVertical: 6,
   },
-  incomeFab: {
-    borderColor: '#2ECC71',
-    borderWidth: 2,
+  actionText: {
+    color: '#0D1117',
+    fontSize: 16,
+    marginLeft: 8,
+    fontWeight: 'bold',
+    fontFamily: 'Poppins_700Bold',
   },
-  expenseFab: {
-    borderColor: '#E74C3C',
-    borderWidth: 2,
+  sectionTitle: {
+    fontSize: 18,
+    color: '#66FCF1',
+    fontWeight: 'bold',
+    fontFamily: 'Poppins_700Bold',
+    marginBottom: 8,
+  },
+  transactionList: {
+    flex: 1,
+  },
+  transactionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1F2833',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 8,
+  },
+  transactionIcon: {
+    marginRight: 12,
+  },
+  transactionDetails: {
+    flex: 1,
+  },
+  transactionDescription: {
+    fontSize: 16,
+    color: '#FFFFFF',
+    fontFamily: 'Poppins_500Medium',
+  },
+  transactionDate: {
+    fontSize: 12,
+    color: '#C5C6C7',
+    fontFamily: 'Poppins_400Regular',
+    marginTop: 4,
+  },
+  transactionAmount: {
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });

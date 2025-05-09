@@ -1,148 +1,126 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import {
+  View, Text, TextInput, TouchableOpacity,
+  StyleSheet, KeyboardAvoidingView,
+  Platform, TouchableWithoutFeedback,
+  Keyboard, Alert
+} from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { saveExpense } from '../services/dbService';
-import { auth } from '../config/firebaseConfig';
-import { Menu, Button, Provider as PaperProvider } from 'react-native-paper';
 
 export default function ExpenseForm() {
-  const [amount, setAmount] = useState('');
-  const [description, setDescription] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('');
-  const [menuVisible, setMenuVisible] = useState(false);
-
   const router = useRouter();
+  const [title, setTitle] = useState('');
+  const [amount, setAmount] = useState('');
+  const [category, setCategory] = useState('');
 
-  const expenseCategories = [
-    'Alimentação',
-    'Transporte',
-    'Moradia',
-    'Educação',
-    'Lazer',
-    'Saúde',
-    'Roupas',
-    'Contas e Serviços',
-    'Viagens',
-    'Outros',
-  ];
-
-  const handleSave = async () => {
-    const userId = auth.currentUser?.uid;
-    if (userId) {
-      try {
-        await saveExpense(userId, {
-          amount: parseFloat(amount),
-          description,
-          category: selectedCategory,
-          date: new Date().toISOString(),
-        });
-        Alert.alert('Sucesso', 'Despesa registrada!', [
-          { text: 'OK', onPress: () => router.push('/HomeScreen') }
-        ]);
-      } catch (error: any) {
-        Alert.alert('Erro', error.message);
-      }
-    }
+  const handleSubmit = () => {
+    // Lógica de submissão (placeholder)
+    Alert.alert('Despesa', 'Despesa adicionada com sucesso!');
+    router.back
   };
 
   return (
-    <PaperProvider>
-      <LinearGradient colors={['#1D3D47', '#A1CEDC']} style={styles.container}>
-        <View style={styles.innerContainer}>
-          <Text style={styles.title}>Registrar Despesa</Text>
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
+        <Text style={styles.title}>Nova Despesa</Text>
 
+        <View style={styles.inputContainer}>
           <TextInput
             style={styles.input}
-            placeholder="Valor (R$)"
-            placeholderTextColor="#ccc"
-            keyboardType="numeric"
+            placeholder="Título"
+            placeholderTextColor="#AAAAAA"
+            value={title}
+            onChangeText={setTitle}
+          />
+        </View>
+
+        <View style={styles.inputContainer}>
+          <TextInput
+            style={styles.input}
+            placeholder="Valor"
+            placeholderTextColor="#AAAAAA"
             value={amount}
             onChangeText={setAmount}
+            keyboardType="numeric"
           />
+        </View>
 
+        <View style={styles.inputContainer}>
           <TextInput
             style={styles.input}
-            placeholder="Descrição"
-            placeholderTextColor="#ccc"
-            value={description}
-            onChangeText={setDescription}
+            placeholder="Categoria"
+            placeholderTextColor="#AAAAAA"
+            value={category}
+            onChangeText={setCategory}
           />
-
-          <View style={{ marginBottom: 16 }}>
-            <Menu
-              visible={menuVisible}
-              onDismiss={() => setMenuVisible(false)}
-              anchor={
-                <Button
-                  mode="outlined"
-                  textColor="#fff"
-                  contentStyle={{ justifyContent: 'space-between' }}
-                  onPress={() => setMenuVisible(true)}
-                  style={{
-                    borderColor: '#fff',
-                    backgroundColor: 'rgba(255,255,255,0.15)',
-                  }}
-                >
-                  {selectedCategory || 'Selecione uma Categoria'}
-                </Button>
-              }
-            >
-              {expenseCategories.map((category) => (
-                <Menu.Item
-                  key={category}
-                  onPress={() => {
-                    setSelectedCategory(category);
-                    setMenuVisible(false);
-                  }}
-                  title={category}
-                />
-              ))}
-            </Menu>
-          </View>
-
-          <TouchableOpacity style={styles.button} onPress={handleSave}>
-            <Text style={styles.buttonText}>Salvar</Text>
-          </TouchableOpacity>
         </View>
-      </LinearGradient>
-    </PaperProvider>
+
+        <TouchableOpacity
+          onPress={handleSubmit}
+          activeOpacity={0.8}
+          style={styles.buttonContainer}
+        >
+          <LinearGradient
+            colors={['#FF5484', '#BA055D']}
+            style={styles.button}
+          >
+            <Text style={styles.buttonText}>Adicionar Despesa</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+      </KeyboardAvoidingView>
+    </TouchableWithoutFeedback>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  innerContainer: {
+  container: {
     flex: 1,
+    backgroundColor: '#0D1117',
+    padding: 16,
     justifyContent: 'center',
-    paddingHorizontal: 32,
   },
   title: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: '#fff',
-    textAlign: 'center',
+    fontSize: 28,
+    color: '#FF5484',
+    fontWeight: 'bold',
+    fontFamily: 'Poppins_700Bold',
     marginBottom: 24,
+    textAlign: 'center',
+  },
+  inputContainer: {
+    backgroundColor: '#1F2833',
+    borderRadius: 8,
+    marginBottom: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   input: {
-    height: 50,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    color: '#fff',
-    marginBottom: 16,
+    color: '#F1F1F1',
+    fontFamily: 'Poppins_400Regular',
     fontSize: 16,
+    paddingVertical: 8,
+  },
+  buttonContainer: {
+    marginTop: 16,
   },
   button: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
+    borderRadius: 25,
     paddingVertical: 14,
     alignItems: 'center',
-    marginTop: 8,
+    shadowColor: '#FF5484',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
   },
   buttonText: {
-    color: '#1D3D47',
+    color: '#0D1117',
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: 'bold',
+    fontFamily: 'Poppins_700Bold',
   },
 });

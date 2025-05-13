@@ -1,6 +1,7 @@
-// app/_layout.tsx
+// src/components/RootLayout.tsx
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
+import { Dimensions, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import {
   Provider as PaperProvider,
@@ -8,19 +9,23 @@ import {
   Modal,
   Portal,
   Text,
-  IconButton,
   Avatar,
   Divider,
+  Appbar,
+  useTheme
 } from 'react-native-paper';
 import { auth } from '../config/firebaseConfig';
+import { COLORS, LAYOUT, TYPO } from '../src/styles';
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 export default function RootLayout() {
   const [drawerVisible, setDrawerVisible] = React.useState(false);
   const router = useRouter();
   const segments = useSegments();
   const user = auth.currentUser;
+  const { colors } = useTheme();
 
-  // Hide menu on login and signup screens
   const hideMenu = ['login', 'signup'].includes(segments[0] || '');
 
   const openDrawer = () => setDrawerVisible(true);
@@ -35,116 +40,135 @@ export default function RootLayout() {
     router.replace('/login');
   };
 
+  const renderHeader = () => {
+    if (hideMenu) {
+      return (
+        <Appbar.Header style={{ backgroundColor: colors.background, elevation: 0 }}>
+          <Appbar.Content title="" />
+        </Appbar.Header>
+      );
+    }
+    return (
+      <Appbar.Header style={{ 
+          backgroundColor: 'transparent', 
+          elevation: 0, 
+          alignItems: 'center', 
+          justifyContent: 'space-between' 
+        }}>
+        <Appbar.Content
+          title="MyFinance"
+          titleStyle={{
+            color: COLORS.primary,
+            fontSize: TYPO.size.lg,
+            fontFamily: TYPO.family.semibold,
+          }}
+        />
+        <Appbar.Action
+          icon="dots-vertical"
+          color={COLORS.text}
+          size={24}
+          onPress={openDrawer}
+          style={{ marginRight: LAYOUT.spacing.sm }}
+        />
+      </Appbar.Header>
+    );
+  };
+
   return (
     <PaperProvider>
+      <Portal>
+        <Modal
+          visible={drawerVisible}
+          onDismiss={closeDrawer}
+          contentContainerStyle={{
+            position: 'absolute',
+            right: 0,
+            top: 0,
+            width: SCREEN_WIDTH * 0.75,
+            height: SCREEN_HEIGHT,
+            backgroundColor: COLORS.surface,
+            padding: LAYOUT.spacing.lg,
+          }}
+        >
+          <DrawerContent
+            user={user}
+            navigateTo={navigateTo}
+            handleLogout={handleLogout}
+          />
+        </Modal>
+      </Portal>
+
       {!hideMenu && (
-        <Portal>
-          <Modal
-            visible={drawerVisible}
-            onDismiss={closeDrawer}
-            contentContainerStyle={styles.drawerContainer}
-          >
-            <View style={styles.drawerContent}>
-              <View style={styles.userSection}>
-                <Avatar.Text size={48} label={user?.email?.charAt(0).toUpperCase() || '?'} />
-                <Text style={styles.email}>{user?.email}</Text>
-              </View>
-              <Divider style={styles.divider} />
-              <Drawer.Item
-                label="Home"
-                icon="home"
-                onPress={() => navigateTo('/HomeScreen')}
-                style={styles.drawerItem}
-              />
-              <Drawer.Item
-                label="Meus Gráficos"
-                icon="chart-bar"
-                onPress={() => navigateTo('/graphs')}
-                style={styles.drawerItem}
-              />
-
-              {/* 🔹 Novo item: Orçamentos */}
-              <Drawer.Item
-                label="Orçamentos"
-                icon="wallet"
-                onPress={() => navigateTo('/BudgetsScreen')}
-                style={styles.drawerItem}
-              />
-
-              {/* 🔹 Novo item: Metas */}
-              <Drawer.Item
-                label="Metas"
-                icon="target"
-                onPress={() => navigateTo('/goals')}
-                style={styles.drawerItem}
-              />
-              <Drawer.Item
-                  label="Relatório Mensal"
-                  icon="file-document-outline"
-                  onPress={() => navigateTo('/monthlyReport')}
-                  style={styles.drawerItem}
-              />
-
-              <View style={styles.spacer} />
-              <Divider style={styles.divider} />
-              <Drawer.Item
-                label="Sair"
-                icon="logout"
-                onPress={handleLogout}
-                style={styles.drawerItem}
-              />
-            </View>
-          </Modal>
-        </Portal>
+        <LinearGradient
+          colors={[COLORS.background, COLORS.surface]}
+          style={{
+            position: 'absolute',
+            top: 0,
+            width: SCREEN_WIDTH,
+            height: LAYOUT.spacing.xl * 2, // ex: 64
+            zIndex: 1,
+          }}
+        />
       )}
 
       <Stack
         screenOptions={{
-          headerStyle: { backgroundColor: '#2C3E50' },
-          headerTitleStyle: { color: '#fff' },
-          headerRight: () => (
-            !hideMenu && (
-              <IconButton icon="dots-vertical" color="#fff" onPress={openDrawer} />
-            )
-          ),
+          header: renderHeader,
         }}
       />
     </PaperProvider>
   );
 }
 
-const styles = StyleSheet.create({
-  drawerContainer: {
-    backgroundColor: '#2C3E50',
-    padding: 20,
-    borderTopRightRadius: 16,
-    borderBottomRightRadius: 16,
-    width: '75%',
-    height: '100%',
-    position: 'absolute',
-    left: 0,
-  },
-  drawerContent: {
-    flex: 1,
-    justifyContent: 'flex-start',
-  },
-  userSection: {
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  email: {
-    color: '#fff',
-    marginTop: 8,
-    fontSize: 16,
-  },
-  drawerItem: {
-    marginVertical: 4,
-  },
-  divider: {
-    marginVertical: 10,
-    backgroundColor: '#fff3',
-  },
-  spacer: {
-    flex: 1,
-  },
-});
+function DrawerContent({ user, navigateTo, handleLogout }) {
+  return (
+    <View>
+      <Avatar.Text
+        size={TYPO.size.xxl}
+        label={user?.email?.charAt(0).toUpperCase() || '?'}
+        style={{
+          alignSelf: 'center',
+          backgroundColor: COLORS.primary,
+          marginBottom: LAYOUT.spacing.md,
+        }}
+      />
+      <Text
+        style={{
+          color: COLORS.textSecondary,
+          textAlign: 'center',
+          marginBottom: LAYOUT.spacing.lg,
+          fontFamily: TYPO.family.regular,
+          fontSize: TYPO.size.md,
+        }}
+      >
+        {user?.email}
+      </Text>
+      <Divider style={{ backgroundColor: COLORS.divider, marginVertical: LAYOUT.spacing.md }} />
+
+      {/* Itens do Drawer */}
+      {[
+        { label: 'Home', icon: 'home', path: '/HomeScreen' },
+        { label: 'Gráficos', icon: 'chart-bar', path: '/graphs' },
+        { label: 'Orçamentos', icon: 'wallet', path: '/BudgetsScreen' },
+        { label: 'Metas', icon: 'target', path: '/goals' },
+        { label: 'Relatório Mensal', icon: 'file-document-outline', path: '/monthlyReport' },
+      ].map(item => (
+        <Drawer.Item
+          key={item.label}
+          label={item.label}
+          icon={item.icon}
+          onPress={() => navigateTo(item.path)}
+          labelStyle={{ color: COLORS.text }}
+        />
+      ))}
+
+      <Divider style={{ backgroundColor: COLORS.divider, marginVertical: LAYOUT.spacing.md }} />
+      <Drawer.Item
+        label="Sair"
+        icon="logout"
+        onPress={handleLogout}
+        labelStyle={{ color: COLORS.text }}
+      />
+    </View>
+  );
+}

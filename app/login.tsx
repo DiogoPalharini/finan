@@ -1,7 +1,8 @@
+// app/LoginScreen.tsx
 import React, { useState } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity,
-  StyleSheet, Alert, KeyboardAvoidingView,
+  View, TextInput, TouchableOpacity,
+  Alert, KeyboardAvoidingView,
   Platform, TouchableWithoutFeedback, Keyboard
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -9,6 +10,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../config/firebaseConfig';
+
+import Title from '../src/components/Title';
+import { COLORS, TYPO, LAYOUT } from '../src/styles';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -27,18 +31,51 @@ export default function LoginScreen() {
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
       <KeyboardAvoidingView
-        style={styles.container}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={{
+          flex: 1,
+          backgroundColor: COLORS.background,
+          padding: LAYOUT.spacing.md,
+          justifyContent: 'center',
+        }}
       >
-        <Text style={styles.title}>Bem-vindo de volta</Text>
-        <Text style={styles.subtitle}>Faça login para continuar</Text>
+        {/* Título */}
+        <Title style={{ fontSize: TYPO.size.xxl, marginBottom: LAYOUT.spacing.sm }}>
+          Bem-vindo de volta
+        </Title>
+        <View style={{ marginBottom: LAYOUT.spacing.lg }}>
+          <Title 
+            style={{ 
+              fontSize: TYPO.size.md, 
+              color: COLORS.textSecondary, 
+              fontFamily: TYPO.family.regular 
+            }}
+          >
+            Faça login para continuar
+          </Title>
+        </View>
 
-        <View style={styles.inputContainer}>
-          <Ionicons name="mail-outline" size={20} color="#66FCF1" style={styles.inputIcon} />
+        {/* E-mail */}
+        <View style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          backgroundColor: COLORS.surface,
+          borderRadius: LAYOUT.radius.small,
+          marginBottom: LAYOUT.spacing.md,
+          paddingHorizontal: LAYOUT.spacing.sm,
+        }}>
+          <Ionicons name="mail-outline" size={TYPO.size.lg} color={COLORS.primary} />
           <TextInput
-            style={styles.input}
+            style={{
+              flex: 1,
+              color: COLORS.text,
+              fontFamily: TYPO.family.regular,
+              fontSize: TYPO.size.md,
+              paddingVertical: LAYOUT.spacing.sm,
+              marginLeft: LAYOUT.spacing.xs,
+            }}
             placeholder="E-mail"
-            placeholderTextColor="#AAAAAA"
+            placeholderTextColor={COLORS.textSecondary}
             value={email}
             onChangeText={setEmail}
             keyboardType="email-address"
@@ -46,112 +83,82 @@ export default function LoginScreen() {
           />
         </View>
 
-        <View style={styles.inputContainer}>
-          <Ionicons name="lock-closed-outline" size={20} color="#66FCF1" style={styles.inputIcon} />
+        {/* Senha */}
+        <View style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          backgroundColor: COLORS.surface,
+          borderRadius: LAYOUT.radius.small,
+          marginBottom: LAYOUT.spacing.md,
+          paddingHorizontal: LAYOUT.spacing.sm,
+        }}>
+          <Ionicons name="lock-closed-outline" size={TYPO.size.lg} color={COLORS.primary} />
           <TextInput
-            style={styles.input}
+            style={{
+              flex: 1,
+              color: COLORS.text,
+              fontFamily: TYPO.family.regular,
+              fontSize: TYPO.size.md,
+              paddingVertical: LAYOUT.spacing.sm,
+              marginLeft: LAYOUT.spacing.xs,
+            }}
             placeholder="Senha"
-            placeholderTextColor="#AAAAAA"
+            placeholderTextColor={COLORS.textSecondary}
+            secureTextEntry
             value={password}
             onChangeText={setPassword}
-            secureTextEntry
           />
         </View>
 
+        {/* Botão Entrar */}
         <TouchableOpacity
           onPress={handleLogin}
           activeOpacity={0.8}
-          style={styles.buttonContainer}
+          style={{ marginBottom: LAYOUT.spacing.lg }}
         >
           <LinearGradient
-            colors={['#66FCF1', '#45A29E']}
-            style={styles.button}
+            colors={[COLORS.primary, COLORS.secondary]}
+            style={{
+              borderRadius: LAYOUT.radius.large,
+              paddingVertical: LAYOUT.spacing.md,
+              alignItems: 'center',
+              elevation: LAYOUT.shadow.elevation,
+            }}
           >
-            <Text style={styles.buttonText}>Entrar</Text>
+            <Title 
+              style={{
+                fontSize: TYPO.size.lg,
+                color: COLORS.background,
+                fontFamily: TYPO.family.bold,
+              }}
+            >
+              Entrar
+            </Title>
           </LinearGradient>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          onPress={() => router.push('/SignUpScreen')}
-          style={styles.linkContainer}
-        >
-          <Text style={styles.linkText}>
-            Ainda não tem conta? <Text style={styles.linkHighlight}>Cadastre-se</Text>
-          </Text>
+        {/* Link para cadastro */}
+        <TouchableOpacity onPress={() => router.push('/SignUpScreen')}>
+          <Title 
+            style={{
+              fontSize: TYPO.size.sm,
+              color: COLORS.textSecondary,
+              fontFamily: TYPO.family.regular,
+              textAlign: 'center',
+            }}
+          >
+            Ainda não tem conta?{' '}
+            <Text 
+              style={{
+                color: COLORS.primary,
+                fontFamily: TYPO.family.semibold,
+              }}
+            >
+              Cadastre-se
+            </Text>
+          </Title>
         </TouchableOpacity>
       </KeyboardAvoidingView>
     </TouchableWithoutFeedback>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0D1117',
-    padding: 16,
-    justifyContent: 'center',
-  },
-  title: {
-    fontSize: 32,
-    color: '#66FCF1',
-    fontWeight: 'bold',
-    fontFamily: 'Poppins_700Bold',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#C5C6C7',
-    fontFamily: 'Poppins_400Regular',
-    marginBottom: 24,
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#1F2833',
-    borderRadius: 8,
-    marginBottom: 16,
-    paddingHorizontal: 12,
-  },
-  inputIcon: {
-    marginRight: 8,
-  },
-  input: {
-    flex: 1,
-    color: '#F1F1F1',
-    fontFamily: 'Poppins_400Regular',
-    paddingVertical: 12,
-    fontSize: 16,
-  },
-  buttonContainer: {
-    marginTop: 16,
-  },
-  button: {
-    borderRadius: 25,
-    paddingVertical: 14,
-    alignItems: 'center',
-    shadowColor: '#66FCF1',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 5,
-  },
-  buttonText: {
-    color: '#0D1117',
-    fontSize: 18,
-    fontWeight: 'bold',
-    fontFamily: 'Poppins_700Bold',
-  },
-  linkContainer: {
-    marginTop: 20,
-  },
-  linkText: {
-    color: '#C5C6C7',
-    fontSize: 14,
-    textAlign: 'center',
-    fontFamily: 'Poppins_400Regular',
-  },
-  linkHighlight: {
-    color: '#66FCF1',
-    fontWeight: 'bold',
-  },
-});

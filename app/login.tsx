@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import {
   View, TextInput, TouchableOpacity,
   Alert, KeyboardAvoidingView,
-  Platform, TouchableWithoutFeedback, Keyboard
+  Platform, TouchableWithoutFeedback, Keyboard, Text
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';

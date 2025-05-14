@@ -1,7 +1,6 @@
 // src/components/RootLayout.tsx
 import React from 'react';
 import { Dimensions, View } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import {
   Provider as PaperProvider,
@@ -15,24 +14,26 @@ import {
   useTheme
 } from 'react-native-paper';
 import { auth } from '../config/firebaseConfig';
+import type { User } from 'firebase/auth';
 import { COLORS, LAYOUT, TYPO } from '../src/styles';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 export default function RootLayout() {
-  const [drawerVisible, setDrawerVisible] = React.useState(false);
   const router = useRouter();
   const segments = useSegments();
-  const user = auth.currentUser;
+  const user = auth.currentUser as User | null;
   const { colors } = useTheme();
+  const [drawerVisible, setDrawerVisible] = React.useState(false);
 
-  const hideMenu = ['login', 'signup'].includes(segments[0] || '');
+  // Identifica telas de autenticação para esconder header
+  const isAuthScreen = ['login', 'signup'].includes(segments[0] || '');
 
   const openDrawer = () => setDrawerVisible(true);
   const closeDrawer = () => setDrawerVisible(false);
   const navigateTo = (path: string) => {
     closeDrawer();
-    router.push(path);
+    router.push(path as any);
   };
   const handleLogout = async () => {
     closeDrawer();
@@ -40,39 +41,19 @@ export default function RootLayout() {
     router.replace('/login');
   };
 
-  const renderHeader = () => {
-    if (hideMenu) {
-      return (
-        <Appbar.Header style={{ backgroundColor: colors.background, elevation: 0 }}>
-          <Appbar.Content title="" />
-        </Appbar.Header>
-      );
-    }
-    return (
-      <Appbar.Header style={{ 
-          backgroundColor: 'transparent', 
-          elevation: 0, 
-          alignItems: 'center', 
-          justifyContent: 'space-between' 
-        }}>
-        <Appbar.Content
-          title="MyFinance"
-          titleStyle={{
-            color: COLORS.primary,
-            fontSize: TYPO.size.lg,
-            fontFamily: TYPO.family.semibold,
-          }}
-        />
-        <Appbar.Action
-          icon="dots-vertical"
-          color={COLORS.text}
-          size={24}
-          onPress={openDrawer}
-          style={{ marginRight: LAYOUT.spacing.sm }}
-        />
-      </Appbar.Header>
-    );
-  };
+  // Header com mesmo fundo da tela e ícone de menu branco
+     const renderHeader = () => (
+    <Appbar.Header style={{ backgroundColor: COLORS.background, elevation: 0, justifyContent: 'space-between' }}>
+      <Appbar.Content title="" />
+      <Appbar.Action
+        icon="menu"
+        color="#ffffff"
+        size={24}
+        onPress={openDrawer}
+      />
+    </Appbar.Header>
+  );
+
 
   return (
     <PaperProvider>
@@ -90,47 +71,35 @@ export default function RootLayout() {
             padding: LAYOUT.spacing.lg,
           }}
         >
-          <DrawerContent
-            user={user}
-            navigateTo={navigateTo}
-            handleLogout={handleLogout}
-          />
+          <DrawerContent user={user} navigateTo={navigateTo} handleLogout={handleLogout} />
         </Modal>
       </Portal>
 
-      {!hideMenu && (
-        <LinearGradient
-          colors={[COLORS.background, COLORS.surface]}
-          style={{
-            position: 'absolute',
-            top: 0,
-            width: SCREEN_WIDTH,
-            height: LAYOUT.spacing.xl * 2, // ex: 64
-            zIndex: 1,
-          }}
-        />
-      )}
-
       <Stack
         screenOptions={{
-          header: renderHeader,
+          header: isAuthScreen ? undefined : renderHeader,
+          headerShown: !isAuthScreen,
+          headerStyle: { backgroundColor: COLORS.background },
+          headerShadowVisible: false,
         }}
       />
     </PaperProvider>
   );
 }
 
-function DrawerContent({ user, navigateTo, handleLogout }) {
+interface DrawerContentProps {
+  user: User | null;
+  navigateTo: (path: string) => void;
+  handleLogout: () => Promise<void>;
+}
+
+function DrawerContent({ user, navigateTo, handleLogout }: DrawerContentProps) {
   return (
     <View>
       <Avatar.Text
         size={TYPO.size.xxl}
         label={user?.email?.charAt(0).toUpperCase() || '?'}
-        style={{
-          alignSelf: 'center',
-          backgroundColor: COLORS.primary,
-          marginBottom: LAYOUT.spacing.md,
-        }}
+        style={{ alignSelf: 'center', backgroundColor: COLORS.primary, marginBottom: LAYOUT.spacing.md }}
       />
       <Text
         style={{
@@ -141,11 +110,10 @@ function DrawerContent({ user, navigateTo, handleLogout }) {
           fontSize: TYPO.size.md,
         }}
       >
-        {user?.email}
+        {user?.email ?? 'Convidado'}
       </Text>
       <Divider style={{ backgroundColor: COLORS.divider, marginVertical: LAYOUT.spacing.md }} />
 
-      {/* Itens do Drawer */}
       {[
         { label: 'Home', icon: 'home', path: '/HomeScreen' },
         { label: 'Gráficos', icon: 'chart-bar', path: '/graphs' },
@@ -158,17 +126,12 @@ function DrawerContent({ user, navigateTo, handleLogout }) {
           label={item.label}
           icon={item.icon}
           onPress={() => navigateTo(item.path)}
-          labelStyle={{ color: COLORS.text }}
+          theme={{ colors: { text: COLORS.text } }}
         />
       ))}
 
       <Divider style={{ backgroundColor: COLORS.divider, marginVertical: LAYOUT.spacing.md }} />
-      <Drawer.Item
-        label="Sair"
-        icon="logout"
-        onPress={handleLogout}
-        labelStyle={{ color: COLORS.text }}
-      />
+      <Drawer.Item label="Sair" icon="logout" onPress={handleLogout} theme={{ colors: { text: COLORS.text } }} />
     </View>
   );
 }

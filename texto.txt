@@ -1,0 +1,20 @@
+chat vamos la tenho algumas ideias do que colocar nesse app e preciso de uma ordem para fazer as coisas e uma melhor colocação de opções de menu, por enquanto tenho essas paginas:
+ { label: 'Home', icon: 'home', path: '/HomeScreen' },
+        { label: 'Gráficos', icon: 'chart-bar', path: '/graphs' },
+        { label: 'Orçamentos', icon: 'wallet', path: '/BudgetsScreen' },
+        { label: 'Metas', icon: 'target', path: '/goals' },
+        { label: 'Relatório Mensal', icon: 'file-document-outline', path: '/monthlyReport' },
+
+estou achando bem ruim e pouco util, estava pensando em:
+1. registrar despesa ou receita a partir das notificações do banco como notificações de compra aprovada ou de pix recebido
+2. uma tela para colocar por data com um calendario para colocar contas a pagar e ou dinheiro a receber envia uma notificação proximo da data e na data para confirar se aquilo aconteceu e se confirmar deve ser inserido automaticamente 
+3. para adicionar despesa ou receita pela home deve ser um modal que vem de baixo levando ui/ux para beleza do modal
+4.atualmente existem graficos no meu app mas estou achando ruim deve pensar em algo para melhorar os graficos serem mais funcionais, fazerem sentido de fato
+5. subistituir esse ingles de orçamentos e metas, colocar nome de limite de gastos e metas de economias ele deve ser feito por categoria.
+6. quero um modal para registrar novas categorias 
+7. o a parte de registrar receitas deve ter campos mais relevantes como local do gasto, não é necessario titulo, local, categoria e valor 
+8. os relatorios devem ser mais relevante defina coisas importantes para ter, uma boa formatação e exportação para pdf 
+9.Mostrar tela inicial com visão geral do saldo e comparações com meses anteriores.
+10. Usar acelerômetro para detectar compras em movimento (compras rápidas).
+11. 	Incluir recibos via foto associada à transação.
+12. Importar e exportar dados financeiros para outros dispositivos. 

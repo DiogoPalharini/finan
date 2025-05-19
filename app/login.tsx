@@ -1,164 +1,164 @@
 // app/LoginScreen.tsx
 import React, { useState } from 'react';
 import {
-  View, TextInput, TouchableOpacity,
-  Alert, KeyboardAvoidingView,
-  Platform, TouchableWithoutFeedback, Keyboard, Text
+  View,
+  TouchableWithoutFeedback,
+  KeyboardAvoidingView,
+  Platform,
+  Keyboard,
+  StyleSheet,
+  Dimensions
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
+import { TextInput, Button, Text } from 'react-native-paper';
 import { useRouter } from 'expo-router';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../config/firebaseConfig';
-
 import Title from '../src/components/Title';
 import { COLORS, TYPO, LAYOUT } from '../src/styles';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export default function LoginScreen() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
+    setLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email, password);
       router.push('/HomeScreen');
     } catch (error: any) {
-      Alert.alert('Erro', error.message);
+      alert(error.message);
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={{
-          flex: 1,
-          backgroundColor: COLORS.background,
-          padding: LAYOUT.spacing.md,
-          justifyContent: 'center',
-        }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.container}
       >
-        {/* Título */}
-        <Title style={{ fontSize: TYPO.size.xxl, marginBottom: LAYOUT.spacing.sm }}>
-          Bem-vindo de volta
-        </Title>
-        <View style={{ marginBottom: LAYOUT.spacing.lg }}>
-          <Title 
-            style={{ 
-              fontSize: TYPO.size.md, 
-              color: COLORS.textSecondary, 
-              fontFamily: TYPO.family.regular 
-            }}
-          >
-            Faça login para continuar
-          </Title>
-        </View>
+        <Title style={styles.title}>Acesse sua Conta</Title>
+        <Text style={styles.subtitle}>Informe seu e‑mail e senha</Text>
 
-        {/* E-mail */}
-        <View style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          backgroundColor: COLORS.surface,
-          borderRadius: LAYOUT.radius.small,
-          marginBottom: LAYOUT.spacing.md,
-          paddingHorizontal: LAYOUT.spacing.sm,
-        }}>
-          <Ionicons name="mail-outline" size={TYPO.size.lg} color={COLORS.primary} />
-          <TextInput
-            style={{
-              flex: 1,
-              color: COLORS.text,
-              fontFamily: TYPO.family.regular,
-              fontSize: TYPO.size.md,
-              paddingVertical: LAYOUT.spacing.sm,
-              marginLeft: LAYOUT.spacing.xs,
-            }}
-            placeholder="E-mail"
-            placeholderTextColor={COLORS.textSecondary}
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-          />
-        </View>
+        <TextInput
+          mode="flat"
+          label="E‑mail"
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+          autoCapitalize="none"
+          left={<TextInput.Icon name="email-outline" color={COLORS.primary} />}
+          style={styles.input}
+          textColor={COLORS.inputText} // <- Aqui
+          theme={{
+            colors: {
+              primary: COLORS.primary,
+              background: COLORS.surface,
+              text: COLORS.inputText,
+              placeholder: COLORS.textSecondary,
+            },
+          }}
+        />
 
-        {/* Senha */}
-        <View style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          backgroundColor: COLORS.surface,
-          borderRadius: LAYOUT.radius.small,
-          marginBottom: LAYOUT.spacing.md,
-          paddingHorizontal: LAYOUT.spacing.sm,
-        }}>
-          <Ionicons name="lock-closed-outline" size={TYPO.size.lg} color={COLORS.primary} />
-          <TextInput
-            style={{
-              flex: 1,
-              color: COLORS.text,
-              fontFamily: TYPO.family.regular,
-              fontSize: TYPO.size.md,
-              paddingVertical: LAYOUT.spacing.sm,
-              marginLeft: LAYOUT.spacing.xs,
-            }}
-            placeholder="Senha"
-            placeholderTextColor={COLORS.textSecondary}
-            secureTextEntry
-            value={password}
-            onChangeText={setPassword}
-          />
-        </View>
+        <TextInput
+          mode="flat"
+          label="Senha"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+          left={<TextInput.Icon name="lock-outline" color={COLORS.primary} />}
+          style={styles.input}
+          textColor={COLORS.inputText} // <- Aqui
+          theme={{
+            colors: {
+              primary: COLORS.primary,
+              background: COLORS.surface,
+              text: COLORS.inputText,
+              placeholder: COLORS.textSecondary,
+            },
+          }}
+        />
 
-        {/* Botão Entrar */}
-        <TouchableOpacity
+        <Button
+          mode="contained"
           onPress={handleLogin}
-          activeOpacity={0.8}
-          style={{ marginBottom: LAYOUT.spacing.lg }}
+          loading={loading}
+          disabled={loading}
+          contentStyle={styles.buttonContent}
+          labelStyle={styles.buttonLabel}
+          style={styles.button}
         >
-          <LinearGradient
-            colors={[COLORS.primary, COLORS.secondary]}
-            style={{
-              borderRadius: LAYOUT.radius.large,
-              paddingVertical: LAYOUT.spacing.md,
-              alignItems: 'center',
-              elevation: LAYOUT.shadow.elevation,
-            }}
-          >
-            <Title 
-              style={{
-                fontSize: TYPO.size.lg,
-                color: COLORS.background,
-                fontFamily: TYPO.family.bold,
-              }}
-            >
-              Entrar
-            </Title>
-          </LinearGradient>
-        </TouchableOpacity>
+          Entrar
+        </Button>
 
-        {/* Link para cadastro */}
-        <TouchableOpacity onPress={() => router.push('/SignUpScreen')}>
-          <Title 
-            style={{
-              fontSize: TYPO.size.sm,
-              color: COLORS.textSecondary,
-              fontFamily: TYPO.family.regular,
-              textAlign: 'center',
-            }}
-          >
+        <View style={styles.linkWrapper}>
+          <Text style={styles.linkText}>
             Ainda não tem conta?{' '}
-            <Text 
-              style={{
-                color: COLORS.primary,
-                fontFamily: TYPO.family.semibold,
-              }}
-            >
-              Cadastre-se
+            <Text style={styles.link} onPress={() => router.push('/SignUpScreen')}>
+              Cadastre‑se
             </Text>
-          </Title>
-        </TouchableOpacity>
+          </Text>
+        </View>
       </KeyboardAvoidingView>
     </TouchableWithoutFeedback>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+    padding: LAYOUT.spacing.md,
+    justifyContent: 'center',
+  },
+  title: {
+    fontSize: TYPO.size.xl,
+    fontFamily: TYPO.family.semibold,
+    color: COLORS.primary,
+    textAlign: 'center',
+    marginBottom: LAYOUT.spacing.sm,
+  },
+  subtitle: {
+    fontSize: TYPO.size.sm,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    marginBottom: LAYOUT.spacing.lg,
+  },
+  input: {
+    backgroundColor: COLORS.surface,
+    borderRadius: LAYOUT.radius.default,
+    marginBottom: LAYOUT.spacing.md,
+    paddingHorizontal: LAYOUT.spacing.sm,
+  },
+  button: {
+    borderRadius: LAYOUT.radius.large,
+    width: SCREEN_WIDTH * 0.8,
+    alignSelf: 'center',
+    marginBottom: LAYOUT.spacing.lg,
+  },
+  buttonContent: {
+    height: 56,
+    justifyContent: 'center',
+  },
+  buttonLabel: {
+    fontSize: TYPO.size.lg,
+    fontFamily: TYPO.family.medium,
+    color: COLORS.surface,
+  },
+  linkWrapper: {
+    alignItems: 'center',
+  },
+  linkText: {
+    fontSize: TYPO.size.sm,
+    color: COLORS.text,
+  },
+  link: {
+    color: COLORS.warning,
+    fontFamily: TYPO.family.semibold,
+  },
+});

@@ -1,17 +1,15 @@
-// src/components/RootLayout.tsx
 import React from 'react';
-import { Dimensions, View } from 'react-native';
+import { Dimensions, View, TouchableOpacity, StyleSheet } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import {
   Provider as PaperProvider,
-  Drawer,
   Modal,
   Portal,
   Text,
   Avatar,
   Divider,
   Appbar,
-  useTheme
+  Icon,
 } from 'react-native-paper';
 import { auth } from '../config/firebaseConfig';
 import type { User } from 'firebase/auth';
@@ -23,10 +21,8 @@ export default function RootLayout() {
   const router = useRouter();
   const segments = useSegments();
   const user = auth.currentUser as User | null;
-  const { colors } = useTheme();
   const [drawerVisible, setDrawerVisible] = React.useState(false);
 
-  // Identifica telas de autenticação para esconder header
   const isAuthScreen = ['login', 'signup'].includes(segments[0] || '');
 
   const openDrawer = () => setDrawerVisible(true);
@@ -41,19 +37,17 @@ export default function RootLayout() {
     router.replace('/login');
   };
 
-  // Header com mesmo fundo da tela e ícone de menu branco
-     const renderHeader = () => (
+  const renderHeader = () => (
     <Appbar.Header style={{ backgroundColor: COLORS.background, elevation: 0, justifyContent: 'space-between' }}>
       <Appbar.Content title="" />
       <Appbar.Action
         icon="menu"
-        color="#ffffff"
-        size={24}
+        color={COLORS.inputText}
+        size={28}
         onPress={openDrawer}
       />
     </Appbar.Header>
   );
-
 
   return (
     <PaperProvider>
@@ -69,12 +63,17 @@ export default function RootLayout() {
             height: SCREEN_HEIGHT,
             backgroundColor: COLORS.surface,
             padding: LAYOUT.spacing.lg,
+            shadowColor: '#000',
+            shadowOpacity: 0.2,
+            shadowRadius: 6,
+            elevation: 10,
+            borderTopLeftRadius: 12,
+            borderBottomLeftRadius: 12,
           }}
         >
           <DrawerContent user={user} navigateTo={navigateTo} handleLogout={handleLogout} />
         </Modal>
       </Portal>
-
       <Stack
         screenOptions={{
           header: isAuthScreen ? undefined : renderHeader,
@@ -103,35 +102,81 @@ function DrawerContent({ user, navigateTo, handleLogout }: DrawerContentProps) {
       />
       <Text
         style={{
-          color: COLORS.textSecondary,
+          color: '#000000',
           textAlign: 'center',
           marginBottom: LAYOUT.spacing.lg,
-          fontFamily: TYPO.family.regular,
+          fontFamily: TYPO.family.medium,
           fontSize: TYPO.size.md,
         }}
       >
         {user?.email ?? 'Convidado'}
       </Text>
-      <Divider style={{ backgroundColor: COLORS.divider, marginVertical: LAYOUT.spacing.md }} />
+
+      <Divider style={{ backgroundColor: COLORS.inputText, marginVertical: LAYOUT.spacing.md }} />
 
       {[
-        { label: 'Home', icon: 'home', path: '/HomeScreen' },
+        { label: 'Home', icon: 'home-outline', path: '/HomeScreen' },
         { label: 'Gráficos', icon: 'chart-bar', path: '/graphs' },
-        { label: 'Orçamentos', icon: 'wallet', path: '/BudgetsScreen' },
+        { label: 'Orçamentos', icon: 'wallet-outline', path: '/BudgetsScreen' },
         { label: 'Metas', icon: 'target', path: '/goals' },
         { label: 'Relatório Mensal', icon: 'file-document-outline', path: '/monthlyReport' },
       ].map(item => (
-        <Drawer.Item
+        <CustomDrawerItem
           key={item.label}
           label={item.label}
           icon={item.icon}
           onPress={() => navigateTo(item.path)}
-          theme={{ colors: { text: COLORS.text } }}
         />
       ))}
 
       <Divider style={{ backgroundColor: COLORS.divider, marginVertical: LAYOUT.spacing.md }} />
-      <Drawer.Item label="Sair" icon="logout" onPress={handleLogout} theme={{ colors: { text: COLORS.text } }} />
+
+      <CustomDrawerItem
+        label="Sair"
+        icon="logout"
+        iconColor={COLORS.danger}
+        onPress={handleLogout}
+      />
     </View>
   );
 }
+
+interface CustomDrawerItemProps {
+  label: string;
+  icon: string;
+  iconColor?: string;
+  onPress: () => void;
+}
+
+function CustomDrawerItem({ label, icon, iconColor = '#000000', onPress }: CustomDrawerItemProps) {
+  return (
+    <TouchableOpacity
+      style={styles.drawerItem}
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
+      <Icon source={icon} color={iconColor} size={24} />
+      <Text
+        style={{
+          color: '#000000', // Explicitly set label color to black
+          fontFamily: TYPO.family.medium,
+          fontSize: TYPO.size.md,
+          marginLeft: LAYOUT.spacing.md,
+        }}
+      >
+        {label}
+      </Text>
+    </TouchableOpacity>
+  );
+}
+
+const styles = StyleSheet.create({
+  drawerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: LAYOUT.spacing.sm,
+    paddingHorizontal: LAYOUT.spacing.md,
+    borderRadius: 12,
+    marginVertical: 4,
+  },
+});

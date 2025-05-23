@@ -14,6 +14,7 @@ import {
 import { auth } from '../config/firebaseConfig';
 import type { User } from 'firebase/auth';
 import { COLORS, LAYOUT, TYPO } from '../src/styles';
+import { AuthProvider } from '../contexts/AuthContext';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -50,39 +51,41 @@ export default function RootLayout() {
   );
 
   return (
-    <PaperProvider>
-      <Portal>
-        <Modal
-          visible={drawerVisible}
-          onDismiss={closeDrawer}
-          contentContainerStyle={{
-            position: 'absolute',
-            right: 0,
-            top: 0,
-            width: SCREEN_WIDTH * 0.75,
-            height: SCREEN_HEIGHT,
-            backgroundColor: COLORS.surface,
-            padding: LAYOUT.spacing.lg,
-            shadowColor: '#000',
-            shadowOpacity: 0.2,
-            shadowRadius: 6,
-            elevation: 10,
-            borderTopLeftRadius: 12,
-            borderBottomLeftRadius: 12,
+    <AuthProvider>
+      <PaperProvider>
+        <Portal>
+          <Modal
+            visible={drawerVisible}
+            onDismiss={closeDrawer}
+            contentContainerStyle={{
+              position: 'absolute',
+              right: 0,
+              top: 0,
+              width: SCREEN_WIDTH * 0.75,
+              height: SCREEN_HEIGHT,
+              backgroundColor: COLORS.surface,
+              padding: LAYOUT.spacing.lg,
+              shadowColor: '#000',
+              shadowOpacity: 0.2,
+              shadowRadius: 6,
+              elevation: 10,
+              borderTopLeftRadius: 12,
+              borderBottomLeftRadius: 12,
+            }}
+          >
+            <DrawerContent user={user} navigateTo={navigateTo} handleLogout={handleLogout} />
+          </Modal>
+        </Portal>
+        <Stack
+          screenOptions={{
+            header: isAuthScreen ? undefined : renderHeader,
+            headerShown: !isAuthScreen,
+            headerStyle: { backgroundColor: COLORS.background },
+            headerShadowVisible: false,
           }}
-        >
-          <DrawerContent user={user} navigateTo={navigateTo} handleLogout={handleLogout} />
-        </Modal>
-      </Portal>
-      <Stack
-        screenOptions={{
-          header: isAuthScreen ? undefined : renderHeader,
-          headerShown: !isAuthScreen,
-          headerStyle: { backgroundColor: COLORS.background },
-          headerShadowVisible: false,
-        }}
-      />
-    </PaperProvider>
+        />
+      </PaperProvider>
+    </AuthProvider>
   );
 }
 

@@ -6,16 +6,7 @@ import { COLORS } from '../src/styles/colors';
 import { TYPO } from '../src/styles/typography';
 import { LAYOUT } from '../src/styles/layout';
 import TransactionItem from './TransactionItem';
-
-interface Transaction {
-  id: string;
-  type: 'income' | 'expense';
-  description: string;
-  amount: number;
-  date: string;
-  category?: string;
-  source?: string;
-}
+import { Transaction, CategoryItem } from '../app/HomeScreen';
 
 interface TransactionListProps {
   isLoading: boolean;
@@ -24,8 +15,8 @@ interface TransactionListProps {
   formatDate: (dateString: string) => string;
   onLongPressItem: (item: Transaction) => void;
   onPressDelete: (item: Transaction) => void;
-  incomeSources: Array<{ id: string; name: string; icon: string }>;
-  expenseCategories: Array<{ id: string; name: string; icon: string }>;
+  incomeSources: CategoryItem[];
+  expenseCategories: CategoryItem[];
 }
 
 const TransactionList: React.FC<TransactionListProps> = ({

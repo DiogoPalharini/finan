@@ -9,6 +9,7 @@ export const LAYOUT = {
   },
   radius: {
     small: 8,
+    medium: 12,
     default: 12,
     large: 20,
   },

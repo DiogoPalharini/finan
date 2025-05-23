@@ -27,12 +27,31 @@ import {
   getExpenses, 
   getIncomes, 
   deleteExpense, 
-  deleteIncome 
+  deleteIncome,
+  Expense,
+  Income
 } from '../services/dbService';
 import { useAuth } from '../hooks/useAuth';
 
+// Tipos
+export interface Transaction {
+  id: string | undefined;
+  type: 'income' | 'expense';
+  description: string;
+  amount: number;
+  date: string;
+  category?: string;
+  source?: string;
+}
+
+export interface CategoryItem {
+  id: string;
+  name: string;
+  icon: string;
+}
+
 // Categorias de despesas
-const expenseCategories = [
+const expenseCategories: CategoryItem[] = [
   { id: 'alimentacao', name: 'Alimentação', icon: 'restaurant-outline' },
   { id: 'transporte', name: 'Transporte', icon: 'car-outline' },
   { id: 'moradia', name: 'Moradia', icon: 'home-outline' },
@@ -43,7 +62,7 @@ const expenseCategories = [
 ];
 
 // Fontes de receita
-const incomeSources = [
+const incomeSources: CategoryItem[] = [
   { id: 'salario', name: 'Salário', icon: 'cash-outline' },
   { id: 'investimentos', name: 'Investimentos', icon: 'trending-up-outline' },
   { id: 'freelance', name: 'Freelance', icon: 'briefcase-outline' },
@@ -59,7 +78,6 @@ const formatCurrency = (value: number): string => {
   });
 };
 
-
 // Formatar data para o padrão brasileiro
 const formatDate = (dateString: string): string => {
   const date = new Date(dateString);
@@ -72,18 +90,18 @@ export default function HomeScreen() {
   const { user } = useAuth();
   
   // Estados para dados
-  const [transactions, setTransactions] = useState([]);
-  const [filteredTransactions, setFilteredTransactions] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [activeFilter, setActiveFilter] = useState('all'); // 'all', 'income', 'expense'
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [activeFilter, setActiveFilter] = useState<'all' | 'income' | 'expense'>('all');
   
   // Estados para modais
-  const [incomeModalVisible, setIncomeModalVisible] = useState(false);
-  const [expenseModalVisible, setExpenseModalVisible] = useState(false);
-  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
-  const [itemToDelete, setItemToDelete] = useState(null);
-  const [fabOpen, setFabOpen] = useState(false);
+  const [incomeModalVisible, setIncomeModalVisible] = useState<boolean>(false);
+  const [expenseModalVisible, setExpenseModalVisible] = useState<boolean>(false);
+  const [deleteModalVisible, setDeleteModalVisible] = useState<boolean>(false);
+  const [itemToDelete, setItemToDelete] = useState<Transaction | null>(null);
+  const [fabOpen, setFabOpen] = useState<boolean>(false);
 
   // Carregar transações
   useEffect(() => {
@@ -96,7 +114,7 @@ export default function HomeScreen() {
   }, [searchQuery, activeFilter, transactions]);
 
   // Função para carregar transações do banco
-  const loadTransactions = async () => {
+  const loadTransactions = async (): Promise<void> => {
     if (!user) return;
     
     setIsLoading(true);
@@ -105,7 +123,7 @@ export default function HomeScreen() {
       const incomes = await getIncomes(user.uid);
       
       // Formatar dados para exibição
-      const formattedExpenses = expenses.map(expense => ({
+      const formattedExpenses: Transaction[] = expenses.map(expense => ({
         id: expense.id,
         type: 'expense',
         description: expense.description,
@@ -114,7 +132,7 @@ export default function HomeScreen() {
         category: expense.category
       }));
       
-      const formattedIncomes = incomes.map(income => ({
+      const formattedIncomes: Transaction[] = incomes.map(income => ({
         id: income.id,
         type: 'income',
         description: income.description,
@@ -122,14 +140,10 @@ export default function HomeScreen() {
         date: income.date,
         source: income.source
       }));
-
-
       
       // Combinar e ordenar por data (mais recente primeiro)
-      const allTransactions = [...formattedExpenses, ...formattedIncomes]
+      const allTransactions: Transaction[] = [...formattedExpenses, ...formattedIncomes]
         .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-      
       setTransactions(allTransactions);
       setFilteredTransactions(allTransactions);
     } catch (error) {
@@ -141,7 +155,7 @@ export default function HomeScreen() {
   };
 
   // Filtrar transações com base na busca e no filtro ativo
-  const filterTransactions = () => {
+  const filterTransactions = (): void => {
     let filtered = [...transactions];
     
     // Aplicar filtro de tipo (receita/despesa/todos)
@@ -163,7 +177,12 @@ export default function HomeScreen() {
   };
 
   // Salvar nova receita
-  const handleSaveIncome = async (amount, description, source, date) => {
+  const handleSaveIncome = async (
+    amount: number, 
+    description: string, 
+    source: string, 
+    date: Date
+  ): Promise<void> => {
     if (!user) {
       Alert.alert('Erro', 'Você precisa estar logado para adicionar uma receita.');
       return;
@@ -194,7 +213,12 @@ export default function HomeScreen() {
   };
 
   // Salvar nova despesa
-  const handleSaveExpense = async (amount, description, category, date) => {
+  const handleSaveExpense = async (
+    amount: number, 
+    description: string, 
+    category: string, 
+    date: Date
+  ): Promise<void> => {
     if (!user) {
       Alert.alert('Erro', 'Você precisa estar logado para adicionar uma despesa.');
       return;
@@ -225,14 +249,14 @@ export default function HomeScreen() {
   };
 
   // Confirmar exclusão de transação
-  const confirmDelete = (item) => {
+  const confirmDelete = (item: Transaction): void => {
     setItemToDelete(item);
     setDeleteModalVisible(true);
   };
 
   // Excluir transação
-  const handleDelete = async () => {
-    if (!user || !itemToDelete) return;
+  const handleDelete = async (): Promise<void> => {
+    if (!user || !itemToDelete || !itemToDelete.id) return;
     
     setIsLoading(true);
     try {
@@ -257,7 +281,7 @@ export default function HomeScreen() {
   };
 
   // Formatar valor para exibição no input
-  const formatValueForInput = (text) => {
+  const formatValueForInput = (text: string): string => {
     // Remove caracteres não numéricos
     const numericValue = text.replace(/\D/g, '');
     
@@ -373,7 +397,7 @@ export default function HomeScreen() {
 
       {/* Botões de Ação Flutuantes */}
       <FAB.Group
-        visible={true} // <- obrigatório
+        visible={true}
         open={fabOpen}
         icon={fabOpen ? 'close' : 'plus'}
         color={COLORS.white}
@@ -394,7 +418,6 @@ export default function HomeScreen() {
           },
         ]}
       />
-
 
       {/* Modal de Nova Receita */}
       <IncomeModal 

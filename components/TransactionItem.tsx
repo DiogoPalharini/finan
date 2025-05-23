@@ -5,24 +5,16 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../src/styles/colors';
 import { TYPO } from '../src/styles/typography';
 import { LAYOUT } from '../src/styles/layout';
+import { Transaction, CategoryItem } from '../app/HomeScreen';
 
-// Tipos
 interface TransactionItemProps {
-  item: {
-    id: string;
-    type: 'income' | 'expense';
-    description: string;
-    amount: number;
-    date: string;
-    category?: string;
-    source?: string;
-  };
+  item: Transaction;
   formatCurrency: (value: number) => string;
   formatDate: (dateString: string) => string;
-  onLongPress: (item: any) => void;
-  onPressDelete: (item: any) => void;
-  incomeSources: Array<{ id: string; name: string; icon: string }>;
-  expenseCategories: Array<{ id: string; name: string; icon: string }>;
+  onLongPress: (item: Transaction) => void;
+  onPressDelete: (item: Transaction) => void;
+  incomeSources: CategoryItem[];
+  expenseCategories: CategoryItem[];
 }
 
 const TransactionItem: React.FC<TransactionItemProps> = ({

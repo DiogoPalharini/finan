@@ -6,14 +6,10 @@ import { LAYOUT } from '../../src/styles/layout';
 import { TYPO } from '../../src/styles/typography';
 
 interface BalanceLineChartProps {
-  data?: {
-    labels: string[];
-    datasets: {
-      data: number[];
-      color?: (opacity?: number) => string;
-      strokeWidth?: number;
-    }[];
-  };
+  data: Array<{
+    month: string;
+    balance: number;
+  }>;
   height?: number;
   width?: number;
 }
@@ -21,15 +17,27 @@ interface BalanceLineChartProps {
 const { width: screenWidth } = Dimensions.get('window');
 
 const BalanceLineChart: React.FC<BalanceLineChartProps> = ({
-  data,
+  data = [],
   height = 220,
   width = screenWidth - 64,
 }) => {
   const [chartData, setChartData] = useState<any>(null);
   
   useEffect(() => {
-    if (data) {
-      setChartData(data);
+    if (data && data.length > 0) {
+      // Transformar dados para o formato esperado pelo LineChart
+      const formattedData = {
+        labels: data.map(item => item.month),
+        datasets: [
+          {
+            data: data.map(item => item.balance),
+            color: (opacity = 1) => `rgba(108, 99, 255, ${opacity})`,
+            strokeWidth: 2
+          }
+        ]
+      };
+      
+      setChartData(formattedData);
     } else {
       // Dados de exemplo quando não há dados reais
       setChartData({
@@ -72,6 +80,8 @@ const BalanceLineChart: React.FC<BalanceLineChartProps> = ({
           bezier
           style={styles.chart}
           fromZero
+          yAxisLabel="R$"
+          yAxisSuffix=""
         />
       )}
     </View>
@@ -84,7 +94,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   chart: {
-    borderRadius: LAYOUT.radius.md,
+    borderRadius: LAYOUT.radius.medium,
     paddingRight: 16,
   }
 });

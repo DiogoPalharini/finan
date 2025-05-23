@@ -9,9 +9,9 @@ import { LAYOUT } from '../../src/styles/layout';
 import { TYPO } from '../../src/styles/typography';
 
 interface ProfileHeaderProps {
-  user: User | null;
-  onProfilePress: () => void;
-  onClose: () => void;
+  user?: User | null;
+  onProfilePress?: () => void;
+  onClose?: () => void;
 }
 
 const ProfileHeader: React.FC<ProfileHeaderProps> = ({ 
@@ -77,13 +77,15 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
       end={{ x: 1, y: 1 }}
       style={styles.headerGradient}
     >
-      <TouchableOpacity 
-        style={styles.closeButton}
-        onPress={onClose}
-        activeOpacity={0.7}
-      >
-        <Ionicons name="close" size={24} color={COLORS.white} />
-      </TouchableOpacity>
+      {onClose && (
+        <TouchableOpacity 
+          style={styles.closeButton}
+          onPress={onClose}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="close" size={24} color={COLORS.white} />
+        </TouchableOpacity>
+      )}
       
       <Animated.View 
         style={[
@@ -112,16 +114,20 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
         
         <View style={styles.userInfo}>
           <Text style={styles.userName}>{getDisplayName()}</Text>
-          <Text style={styles.userEmail}>{user?.email || 'Sem email'}</Text>
+          <Text style={styles.userEmail} numberOfLines={1} ellipsizeMode="tail">
+            {user?.email || 'Sem email'}
+          </Text>
           
-          <TouchableOpacity 
-            style={styles.viewProfileButton}
-            onPress={onProfilePress}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.viewProfileText}>Ver perfil</Text>
-            <Ionicons name="chevron-forward" size={16} color={COLORS.white} />
-          </TouchableOpacity>
+          {onProfilePress && (
+            <TouchableOpacity 
+              style={styles.viewProfileButton}
+              onPress={onProfilePress}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.viewProfileText}>Ver perfil</Text>
+              <Ionicons name="chevron-forward" size={16} color={COLORS.white} />
+            </TouchableOpacity>
+          )}
         </View>
       </Animated.View>
     </LinearGradient>

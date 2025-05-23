@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, StyleSheet, TouchableOpacity, Image, Animated, Dimensions } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Animated, Dimensions } from 'react-native';
 import { Text } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -8,73 +8,91 @@ import { LAYOUT } from '../../src/styles/layout';
 import { TYPO } from '../../src/styles/typography';
 import ProfileHeader from './ProfileHeader';
 import MenuItem from './MenuItem';
-import { auth } from '../../config/firebaseConfig';
+import { User } from 'firebase/auth';
 
 const { width } = Dimensions.get('window');
 
-const DrawerContent = ({ user, navigateTo, handleLogout, closeDrawer }) => {
+interface DrawerContentProps {
+  user: User | null;
+  navigateTo: (path: string) => void;
+  handleLogout: () => void;
+  closeDrawer: () => void;
+  currentRoute?: string;
+}
+
+const DrawerContent: React.FC<DrawerContentProps> = ({ 
+  user, 
+  navigateTo, 
+  handleLogout, 
+  closeDrawer,
+  currentRoute = '/'
+}) => {
   const scrollY = React.useRef(new Animated.Value(0)).current;
   const [menuItems] = React.useState([
     {
       key: 'home',
       label: 'Início',
       icon: 'home-outline',
-      route: '/',
-      active: false,
+      route: '/HomeScreen',
+      active: currentRoute === '/HomeScreen',
     },
     {
       key: 'charts',
       label: 'Gráficos',
       icon: 'bar-chart-outline',
       route: '/charts',
-      active: false,
+      active: currentRoute === '/charts',
     },
     {
       key: 'goals',
       label: 'Metas',
       icon: 'flag-outline',
       route: '/goals',
-      active: false,
+      active: currentRoute === '/goals',
     },
     {
       key: 'budget',
       label: 'Planejamento',
       icon: 'wallet-outline',
       route: '/budget',
-      active: false,
+      active: currentRoute === '/budget',
     },
     {
       key: 'reports',
       label: 'Relatórios',
       icon: 'document-text-outline',
       route: '/reports',
-      active: false,
-    },
-    {
-      key: 'profile',
-      label: 'Perfil',
-      icon: 'person-outline',
-      route: '/profile',
-      active: false,
+      active: currentRoute === '/reports',
     },
   ]);
 
   const [settingsItems] = React.useState([
     {
+      key: 'profile',
+      label: 'Perfil',
+      icon: 'person-outline',
+      route: '/profile',
+      active: currentRoute === '/profile',
+    },
+    {
       key: 'settings',
       label: 'Config.',
       icon: 'settings-outline',
       route: '/settings',
-      active: false,
+      active: currentRoute === '/settings',
     },
     {
       key: 'help',
       label: 'Ajuda',
       icon: 'help-circle-outline',
       route: '/help',
-      active: false,
+      active: currentRoute === '/help',
     },
   ]);
+
+  const handleProfilePress = () => {
+    navigateTo('/profile');
+  };
 
   return (
     <View style={styles.container}>
@@ -97,7 +115,10 @@ const DrawerContent = ({ user, navigateTo, handleLogout, closeDrawer }) => {
           { useNativeDriver: false }
         )}
       >
-        <ProfileHeader />
+        <ProfileHeader 
+          user={user} 
+          onProfilePress={handleProfilePress}
+        />
         
         <View style={styles.menuContainer}>
           <Text style={styles.menuSectionTitle}>Menu Principal</Text>
@@ -205,7 +226,7 @@ const styles = StyleSheet.create({
     borderTopColor: COLORS.divider,
   },
   logoutButton: {
-    borderRadius: LAYOUT.radius.lg,
+    borderRadius: LAYOUT.radius.large,
     overflow: 'hidden',
     marginBottom: LAYOUT.spacing.md,
     elevation: 2,

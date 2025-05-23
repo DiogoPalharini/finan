@@ -17,6 +17,7 @@ export default function RootLayout() {
   const [user, setUser] = React.useState(auth.currentUser as User | null);
   const [drawerVisible, setDrawerVisible] = React.useState(false);
   const [drawerAnimation] = React.useState(new Animated.Value(0));
+  const [currentRoute, setCurrentRoute] = React.useState('/');
 
   // Monitorar mudanças no estado de autenticação
   useEffect(() => {
@@ -24,21 +25,30 @@ export default function RootLayout() {
       setUser(authUser);
       
       // Redirecionar com base no estado de autenticação
-      const isAuthRoute = ['login', 'register'].includes(segments[0] || '');
+      const isAuthRoute = ['login', 'SignUpScreen'].includes(segments[0] || '');
       
       if (!authUser && !isAuthRoute) {
         // Usuário não autenticado e não está em uma rota de autenticação
-        router.replace('/login');
+        router.replace('/LoginScreen');
       } else if (authUser && isAuthRoute) {
         // Usuário autenticado e está em uma rota de autenticação
-        router.replace('/login');
+        router.replace('/HomeScreen');
       }
     });
     
     return () => unsubscribe();
   }, [segments]);
 
-  const isAuthScreen = ['login', 'register'].includes(segments[0] || '');
+  // Monitorar mudanças de rota para atualizar o menu
+  useEffect(() => {
+    if (segments && segments.length > 0) {
+      setCurrentRoute(`/${segments[0]}`);
+    } else {
+      setCurrentRoute('/');
+    }
+  }, [segments]);
+
+  const isAuthScreen = ['LoginScreen', 'SignUpScreen'].includes(segments[0] || '');
 
   const openDrawer = () => {
     setDrawerVisible(true);
@@ -70,7 +80,7 @@ export default function RootLayout() {
     closeDrawer();
     try {
       await auth.signOut();
-      router.replace('/login');
+      router.replace('/LoginScreen');
     } catch (error) {
       console.error('Erro ao fazer logout:', error);
     }
@@ -130,6 +140,7 @@ export default function RootLayout() {
                 navigateTo={navigateTo} 
                 handleLogout={handleLogout}
                 closeDrawer={closeDrawer}
+                currentRoute={currentRoute}
               />
             </Animated.View>
           </Modal>

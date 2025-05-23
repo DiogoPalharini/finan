@@ -484,17 +484,22 @@ const styles = StyleSheet.create({
   summaryContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginHorizontal: LAYOUT.spacing.lg,
-    marginTop: LAYOUT.spacing.lg,
+    marginHorizontal: LAYOUT.spacing.md,
+    marginTop: -LAYOUT.spacing.xl,
+    marginBottom: LAYOUT.spacing.md,
   },
   summaryCard: {
     flex: 1,
     backgroundColor: COLORS.surface,
-    borderRadius: LAYOUT.radius.lg,
-    padding: LAYOUT.spacing.md,
+    borderRadius: LAYOUT.radius.medium,
+    padding: LAYOUT.spacing.sm,
     marginHorizontal: LAYOUT.spacing.xs,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
     alignItems: 'center',
-    ...LAYOUT.shadow.small,
   },
   iconContainer: {
     width: 36,
@@ -506,9 +511,9 @@ const styles = StyleSheet.create({
   },
   summaryLabel: {
     fontSize: TYPO.size.xs,
-    fontFamily: TYPO.family.regular,
+    fontFamily: TYPO.family.medium,
     color: COLORS.textSecondary,
-    marginBottom: 2,
+    marginBottom: LAYOUT.spacing.xs,
   },
   summaryValue: {
     fontSize: TYPO.size.sm,
@@ -518,31 +523,32 @@ const styles = StyleSheet.create({
   negativeValue: {
     color: COLORS.danger,
   },
-  content: {
-    flex: 1,
-    marginTop: LAYOUT.spacing.lg,
-  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: LAYOUT.spacing.xl,
+    paddingVertical: LAYOUT.spacing.xl,
   },
   loadingText: {
+    marginTop: LAYOUT.spacing.md,
     fontSize: TYPO.size.md,
     fontFamily: TYPO.family.medium,
     color: COLORS.textSecondary,
-    marginTop: LAYOUT.spacing.sm,
+  },
+  content: {
+    flex: 1,
+    paddingHorizontal: LAYOUT.spacing.md,
   },
   actionsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginHorizontal: LAYOUT.spacing.lg,
     marginVertical: LAYOUT.spacing.lg,
+    paddingBottom: LAYOUT.spacing.xl,
   },
   actionButton: {
     flex: 1,
     marginHorizontal: LAYOUT.spacing.xs,
+    borderRadius: LAYOUT.radius.medium,
   },
   actionButtonLabel: {
     fontSize: TYPO.size.sm,

@@ -30,7 +30,7 @@ const ExpensePieChart: React.FC<ExpensePieChartProps> = ({ data }) => {
       // Preparar dados para o gráfico
       const formattedData = data.map(item => ({
         name: item.name,
-        value: item.value,
+        population: item.value, // Alterado de 'value' para 'population' para compatibilidade
         color: item.color,
         legendFontColor: COLORS.text,
         legendFontSize: 12,
@@ -42,7 +42,7 @@ const ExpensePieChart: React.FC<ExpensePieChartProps> = ({ data }) => {
       setChartData([
         {
           name: 'Sem dados',
-          value: 1,
+          population: 1, // Alterado de 'value' para 'population' para compatibilidade
           color: COLORS.divider,
           legendFontColor: COLORS.textSecondary,
           legendFontSize: 12,
@@ -79,7 +79,7 @@ const ExpensePieChart: React.FC<ExpensePieChartProps> = ({ data }) => {
                   borderRadius: 16,
                 },
               }}
-              accessor="value"
+              accessor="population" // Alterado de 'value' para 'population' para compatibilidade
               backgroundColor="transparent"
               paddingLeft="15"
               absolute
@@ -93,7 +93,7 @@ const ExpensePieChart: React.FC<ExpensePieChartProps> = ({ data }) => {
           </View>
           
           <View style={styles.legendContainer}>
-            {chartData.map((item, index) => (
+            {data.map((item, index) => (
               <View key={index} style={styles.legendItem}>
                 <View style={[styles.legendColor, { backgroundColor: item.color }]} />
                 <Text style={styles.legendName} numberOfLines={1}>{item.name}</Text>

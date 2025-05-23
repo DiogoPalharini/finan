@@ -144,6 +144,7 @@ export default function HomeScreen() {
       // Combinar e ordenar por data (mais recente primeiro)
       const allTransactions: Transaction[] = [...formattedExpenses, ...formattedIncomes]
         .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      
       setTransactions(allTransactions);
       setFilteredTransactions(allTransactions);
     } catch (error) {

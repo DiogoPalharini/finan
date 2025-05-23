@@ -1,54 +1,105 @@
-import React from 'react';
-import { Dimensions, View, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useEffect } from 'react';
+import { Dimensions, View, StyleSheet, Animated } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
-import {
-  Provider as PaperProvider,
-  Modal,
-  Portal,
-  Text,
-  Avatar,
-  Divider,
-  Appbar,
-  Icon,
-} from 'react-native-paper';
+import { Provider as PaperProvider, Modal, Portal, Appbar } from 'react-native-paper';
 import { auth } from '../config/firebaseConfig';
 import type { User } from 'firebase/auth';
-import { COLORS, LAYOUT, TYPO } from '../src/styles';
+import { COLORS } from '../src/styles/colors';
+import { LAYOUT } from '../src/styles/layout';
 import { AuthProvider } from '../contexts/AuthContext';
+import DrawerContent from '../components/Menu/DrawerContent';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 export default function RootLayout() {
   const router = useRouter();
   const segments = useSegments();
-  const user = auth.currentUser as User | null;
+  const [user, setUser] = React.useState(auth.currentUser as User | null);
   const [drawerVisible, setDrawerVisible] = React.useState(false);
+  const [drawerAnimation] = React.useState(new Animated.Value(0));
 
-  const isAuthScreen = ['login', 'signup'].includes(segments[0] || '');
+  // Monitorar mudanças no estado de autenticação
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged((authUser) => {
+      setUser(authUser);
+      
+      // Redirecionar com base no estado de autenticação
+      const isAuthRoute = ['login', 'register'].includes(segments[0] || '');
+      
+      if (!authUser && !isAuthRoute) {
+        // Usuário não autenticado e não está em uma rota de autenticação
+        router.replace('/login');
+      } else if (authUser && isAuthRoute) {
+        // Usuário autenticado e está em uma rota de autenticação
+        router.replace('/login');
+      }
+    });
+    
+    return () => unsubscribe();
+  }, [segments]);
 
-  const openDrawer = () => setDrawerVisible(true);
-  const closeDrawer = () => setDrawerVisible(false);
+  const isAuthScreen = ['login', 'register'].includes(segments[0] || '');
+
+  const openDrawer = () => {
+    setDrawerVisible(true);
+    Animated.timing(drawerAnimation, {
+      toValue: 1,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  };
+  
+  const closeDrawer = () => {
+    Animated.timing(drawerAnimation, {
+      toValue: 0,
+      duration: 250,
+      useNativeDriver: true,
+    }).start(() => {
+      setDrawerVisible(false);
+    });
+  };
+  
   const navigateTo = (path: string) => {
     closeDrawer();
-    router.push(path as any);
+    setTimeout(() => {
+      router.push(path);
+    }, 300);
   };
+  
   const handleLogout = async () => {
     closeDrawer();
-    await auth.signOut();
-    router.replace('/login');
+    try {
+      await auth.signOut();
+      router.replace('/login');
+    } catch (error) {
+      console.error('Erro ao fazer logout:', error);
+    }
   };
 
   const renderHeader = () => (
-    <Appbar.Header style={{ backgroundColor: COLORS.background, elevation: 0, justifyContent: 'space-between' }}>
+    <Appbar.Header style={styles.appbar}>
       <Appbar.Content title="" />
       <Appbar.Action
         icon="menu"
-        color={COLORS.inputText}
+        color={COLORS.secondary}
         size={28}
         onPress={openDrawer}
+        style={styles.menuButton}
       />
     </Appbar.Header>
   );
+
+  // Animação do backdrop
+  const backdropOpacity = drawerAnimation.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 0.5],
+  });
+
+  // Animação do drawer
+  const drawerTranslateX = drawerAnimation.interpolate({
+    inputRange: [0, 1],
+    outputRange: [SCREEN_WIDTH, 0],
+  });
 
   return (
     <AuthProvider>
@@ -57,23 +108,30 @@ export default function RootLayout() {
           <Modal
             visible={drawerVisible}
             onDismiss={closeDrawer}
-            contentContainerStyle={{
-              position: 'absolute',
-              right: 0,
-              top: 0,
-              width: SCREEN_WIDTH * 0.75,
-              height: SCREEN_HEIGHT,
-              backgroundColor: COLORS.surface,
-              padding: LAYOUT.spacing.lg,
-              shadowColor: '#000',
-              shadowOpacity: 0.2,
-              shadowRadius: 6,
-              elevation: 10,
-              borderTopLeftRadius: 12,
-              borderBottomLeftRadius: 12,
-            }}
+            contentContainerStyle={styles.modalContainer}
+            dismissable={true}
           >
-            <DrawerContent user={user} navigateTo={navigateTo} handleLogout={handleLogout} />
+            <Animated.View 
+              style={[
+                styles.backdrop,
+                { opacity: backdropOpacity }
+              ]}
+              pointerEvents={drawerVisible ? 'auto' : 'none'}
+              onTouchStart={closeDrawer}
+            />
+            <Animated.View
+              style={[
+                styles.drawerContainer,
+                { transform: [{ translateX: drawerTranslateX }] }
+              ]}
+            >
+              <DrawerContent 
+                user={user} 
+                navigateTo={navigateTo} 
+                handleLogout={handleLogout}
+                closeDrawer={closeDrawer}
+              />
+            </Animated.View>
           </Modal>
         </Portal>
         <Stack
@@ -89,97 +147,40 @@ export default function RootLayout() {
   );
 }
 
-interface DrawerContentProps {
-  user: User | null;
-  navigateTo: (path: string) => void;
-  handleLogout: () => Promise<void>;
-}
-
-function DrawerContent({ user, navigateTo, handleLogout }: DrawerContentProps) {
-  return (
-    <View>
-      <Avatar.Text
-        size={TYPO.size.xxl}
-        label={user?.email?.charAt(0).toUpperCase() || '?'}
-        style={{ alignSelf: 'center', backgroundColor: COLORS.primary, marginBottom: LAYOUT.spacing.md }}
-      />
-      <Text
-        style={{
-          color: '#000000',
-          textAlign: 'center',
-          marginBottom: LAYOUT.spacing.lg,
-          fontFamily: TYPO.family.medium,
-          fontSize: TYPO.size.md,
-        }}
-      >
-        {user?.email ?? 'Convidado'}
-      </Text>
-
-      <Divider style={{ backgroundColor: COLORS.inputText, marginVertical: LAYOUT.spacing.md }} />
-
-      {[
-        { label: 'Home', icon: 'home-outline', path: '/HomeScreen' },
-        { label: 'Gráficos', icon: 'chart-bar', path: '/graphs' },
-        { label: 'Orçamentos', icon: 'wallet-outline', path: '/BudgetsScreen' },
-        { label: 'Metas', icon: 'target', path: '/goals' },
-        { label: 'Relatório Mensal', icon: 'file-document-outline', path: '/monthlyReport' },
-      ].map(item => (
-        <CustomDrawerItem
-          key={item.label}
-          label={item.label}
-          icon={item.icon}
-          onPress={() => navigateTo(item.path)}
-        />
-      ))}
-
-      <Divider style={{ backgroundColor: COLORS.divider, marginVertical: LAYOUT.spacing.md }} />
-
-      <CustomDrawerItem
-        label="Sair"
-        icon="logout"
-        iconColor={COLORS.danger}
-        onPress={handleLogout}
-      />
-    </View>
-  );
-}
-
-interface CustomDrawerItemProps {
-  label: string;
-  icon: string;
-  iconColor?: string;
-  onPress: () => void;
-}
-
-function CustomDrawerItem({ label, icon, iconColor = '#000000', onPress }: CustomDrawerItemProps) {
-  return (
-    <TouchableOpacity
-      style={styles.drawerItem}
-      onPress={onPress}
-      activeOpacity={0.7}
-    >
-      <Icon source={icon} color={iconColor} size={24} />
-      <Text
-        style={{
-          color: '#000000', // Explicitly set label color to black
-          fontFamily: TYPO.family.medium,
-          fontSize: TYPO.size.md,
-          marginLeft: LAYOUT.spacing.md,
-        }}
-      >
-        {label}
-      </Text>
-    </TouchableOpacity>
-  );
-}
-
 const styles = StyleSheet.create({
-  drawerItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: LAYOUT.spacing.sm,
-    paddingHorizontal: LAYOUT.spacing.md,
-    borderRadius: 12,
-    marginVertical: 4,
+  appbar: {
+    backgroundColor: COLORS.background, 
+    elevation: 0, 
+    justifyContent: 'space-between'
   },
+  menuButton: {
+    borderRadius: 12,
+    marginRight: 8,
+  },
+  modalContainer: {
+    margin: 0,
+    flex: 1,
+  },
+  backdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#000',
+  },
+  drawerContainer: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    width: SCREEN_WIDTH * 0.85,
+    height: SCREEN_HEIGHT,
+    backgroundColor: COLORS.surface,
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    elevation: 10,
+    borderTopLeftRadius: 20,
+    borderBottomLeftRadius: 20,
+  }
 });

@@ -1,124 +1,78 @@
-import React, { useState } from 'react';
-import {
-  View, ScrollView, StyleSheet, TouchableOpacity, 
-  KeyboardAvoidingView, Platform, Dimensions
+import React, { useState, useEffect } from 'react';
+import { 
+  View, 
+  StyleSheet, 
+  Modal, 
+  TouchableOpacity, 
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+  Dimensions
 } from 'react-native';
-import { Text, TextInput, Button, HelperText, ActivityIndicator } from 'react-native-paper';
+import { Text, TextInput, Button, ActivityIndicator, HelperText } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
 import { COLORS } from '../src/styles/colors';
 import { LAYOUT } from '../src/styles/layout';
 import { TYPO } from '../src/styles/typography';
-import { signUp } from '../services/authService';
-import { saveUserProfile } from '../services/userService';
+import { updateUserProfile, UserProfile } from '../services/userService';
+import { useAuth } from '../hooks/useAuth';
+
+interface EditProfileModalProps {
+  visible: boolean;
+  onClose: () => void;
+  onSuccess: () => void;
+  currentProfile: Partial<UserProfile> | null;
+}
 
 const { width } = Dimensions.get('window');
 
-// Componente de etapa do cadastro
-interface StepProps {
-  currentStep: number;
-  totalSteps: number;
-}
-
-const StepIndicator: React.FC<StepProps> = ({ currentStep, totalSteps }) => {
-  return (
-    <View style={styles.stepContainer}>
-      {Array.from({ length: totalSteps }).map((_, index) => (
-        <View 
-          key={index} 
-          style={[
-            styles.stepDot, 
-            index === currentStep && styles.activeStepDot
-          ]} 
-        />
-      ))}
-    </View>
-  );
-};
-
-// Componente principal de cadastro
-export default function RegisterScreen() {
-  const router = useRouter();
-  const [currentStep, setCurrentStep] = useState(0);
-  const totalSteps = 3;
+const EditProfileModal: React.FC<EditProfileModalProps> = ({
+  visible,
+  onClose,
+  onSuccess,
+  currentProfile
+}) => {
+  const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
+  const [currentStep, setCurrentStep] = useState(0);
+  const [password, setPassword] = useState('');
+  const [errors, setErrors] = useState<Record<string, string>>({});
   
   // Estados para os campos do formulário
-  // Etapa 1: Informações básicas
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [name, setName] = useState(currentProfile?.displayName || '');
+  const [phone, setPhone] = useState(currentProfile?.phoneNumber || '');
+  const [birthDate, setBirthDate] = useState(currentProfile?.birthDate || '');
+  const [cpf, setCpf] = useState(currentProfile?.cpf || '');
+  const [gender, setGender] = useState(currentProfile?.gender || '');
+  const [profession, setProfession] = useState(currentProfile?.profession || '');
+  const [employmentStatus, setEmploymentStatus] = useState(currentProfile?.employmentStatus || '');
+  const [monthlyIncome, setMonthlyIncome] = useState(currentProfile?.monthlyIncome || '');
+  const [financialGoal, setFinancialGoal] = useState(currentProfile?.financialGoal || '');
   
-  // Etapa 2: Informações pessoais
-  const [phone, setPhone] = useState('');
-  const [birthDate, setBirthDate] = useState('');
-  const [cpf, setCpf] = useState('');
-  const [gender, setGender] = useState('');
+  // Atualizar estados quando o perfil atual mudar
+  useEffect(() => {
+    if (currentProfile) {
+      setName(currentProfile.displayName || '');
+      setPhone(currentProfile.phoneNumber || '');
+      setBirthDate(currentProfile.birthDate || '');
+      setCpf(currentProfile.cpf || '');
+      setGender(currentProfile.gender || '');
+      setProfession(currentProfile.profession || '');
+      setEmploymentStatus(currentProfile.employmentStatus || '');
+      setMonthlyIncome(currentProfile.monthlyIncome || '');
+      setFinancialGoal(currentProfile.financialGoal || '');
+    }
+  }, [currentProfile]);
   
-  // Etapa 3: Informações financeiras
-  const [profession, setProfession] = useState('');
-  const [employmentStatus, setEmploymentStatus] = useState('');
-  const [monthlyIncome, setMonthlyIncome] = useState('');
-  const [financialGoal, setFinancialGoal] = useState('');
+  // Resetar modal ao fechar
+  const handleClose = () => {
+    setCurrentStep(0);
+    setPassword('');
+    setErrors({});
+    onClose();
+  };
   
-  // Estados para validação
-  const [errors, setErrors] = useState<Record<string, string>>({});
-
-  // Validar campos da etapa atual
-  const validateCurrentStep = (): boolean => {
-    const newErrors: Record<string, string> = {};
-    
-    if (currentStep === 0) {
-      // Validar etapa 1
-      if (!name.trim()) newErrors.name = 'Nome é obrigatório';
-      if (!email.trim()) newErrors.email = 'Email é obrigatório';
-      else if (!/\S+@\S+\.\S+/.test(email)) newErrors.email = 'Email inválido';
-      
-      if (!password) newErrors.password = 'Senha é obrigatória';
-      else if (password.length < 6) newErrors.password = 'Senha deve ter pelo menos 6 caracteres';
-      
-      if (password !== confirmPassword) newErrors.confirmPassword = 'Senhas não conferem';
-    } 
-    else if (currentStep === 1) {
-      // Validar etapa 2
-      if (!phone.trim()) newErrors.phone = 'Telefone é obrigatório';
-      if (!birthDate.trim()) newErrors.birthDate = 'Data de nascimento é obrigatória';
-      // CPF e gênero são opcionais
-    } 
-    else if (currentStep === 2) {
-      // Validar etapa 3
-      if (!profession.trim()) newErrors.profession = 'Profissão é obrigatória';
-      if (!monthlyIncome.trim()) newErrors.monthlyIncome = 'Renda mensal é obrigatória';
-      if (!financialGoal.trim()) newErrors.financialGoal = 'Objetivo financeiro é obrigatório';
-      // Status de emprego é opcional
-    }
-    
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  // Avançar para a próxima etapa
-  const handleNext = () => {
-    if (validateCurrentStep()) {
-      if (currentStep < totalSteps - 1) {
-        setCurrentStep(currentStep + 1);
-      } else {
-        handleRegister();
-      }
-    }
-  };
-
-  // Voltar para a etapa anterior
-  const handleBack = () => {
-    if (currentStep > 0) {
-      setCurrentStep(currentStep - 1);
-    } else {
-      router.back();
-    }
-  };
-
   // Formatar telefone
   const formatPhone = (text: string) => {
     const cleaned = text.replace(/\D/g, '');
@@ -176,19 +130,55 @@ export default function RegisterScreen() {
     
     return formatted;
   };
-
-  // Registrar usuário
-  const handleRegister = async () => {
-    if (!validateCurrentStep()) return;
+  
+  // Validar campos
+  const validateFields = () => {
+    const newErrors: Record<string, string> = {};
+    
+    if (currentStep === 0) {
+      if (!name.trim()) newErrors.name = 'Nome é obrigatório';
+      if (!phone.trim()) newErrors.phone = 'Telefone é obrigatório';
+      if (!birthDate.trim()) newErrors.birthDate = 'Data de nascimento é obrigatória';
+    } else if (currentStep === 1) {
+      if (!profession.trim()) newErrors.profession = 'Profissão é obrigatória';
+      if (!monthlyIncome) newErrors.monthlyIncome = 'Renda mensal é obrigatória';
+      if (!financialGoal) newErrors.financialGoal = 'Objetivo financeiro é obrigatório';
+    } else if (currentStep === 2) {
+      if (!password) newErrors.password = 'Senha é obrigatória para confirmar alterações';
+    }
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+  
+  // Avançar para a próxima etapa
+  const handleNext = () => {
+    if (validateFields()) {
+      if (currentStep < 2) {
+        setCurrentStep(currentStep + 1);
+      } else {
+        handleSaveProfile();
+      }
+    }
+  };
+  
+  // Voltar para a etapa anterior
+  const handleBack = () => {
+    if (currentStep > 0) {
+      setCurrentStep(currentStep - 1);
+    } else {
+      handleClose();
+    }
+  };
+  
+  // Salvar perfil
+  const handleSaveProfile = async () => {
+    if (!validateFields() || !user) return;
     
     setIsLoading(true);
     try {
-      // Criar usuário no Firebase Auth
-      const userCredential = await signUp(email, password);
-      const userId = userCredential.uid;
-      
-      // Salvar dados adicionais no perfil
-      await saveUserProfile(userId, {
+      // Preparar dados do perfil
+      const profileData: Partial<UserProfile> = {
         displayName: name,
         phoneNumber: phone,
         birthDate: birthDate,
@@ -198,34 +188,35 @@ export default function RegisterScreen() {
         employmentStatus: employmentStatus as any,
         monthlyIncome: monthlyIncome,
         financialGoal: financialGoal as any,
-        preferredCurrency: 'BRL',
-        notificationPreference: 'diaria',
-        createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
-      });
+      };
       
-      // Redirecionar para a tela inicial
-      router.replace('/HomeScreen');
+      // Atualizar perfil com verificação de senha
+      await updateUserProfile(user.uid, profileData, password);
+      
+      // Fechar modal e notificar sucesso
+      onSuccess();
+      handleClose();
     } catch (error) {
-      console.error('Erro ao cadastrar:', error);
+      console.error('Erro ao atualizar perfil:', error);
       setErrors({
         ...errors,
-        general: 'Erro ao criar conta. Verifique seus dados e tente novamente.'
+        general: 'Erro ao atualizar perfil. Verifique sua senha e tente novamente.'
       });
     } finally {
       setIsLoading(false);
     }
   };
-
+  
   // Renderizar etapa atual
   const renderStep = () => {
     switch (currentStep) {
       case 0:
         return (
           <>
-            <Text style={styles.stepTitle}>Informações básicas</Text>
+            <Text style={styles.stepTitle}>Informações pessoais</Text>
             <Text style={styles.stepDescription}>
-              Vamos começar com suas informações principais
+              Atualize suas informações pessoais
             </Text>
             
             <View style={styles.inputContainer}>
@@ -241,62 +232,6 @@ export default function RegisterScreen() {
               />
             </View>
             {errors.name && <HelperText type="error">{errors.name}</HelperText>}
-            
-            <View style={styles.inputContainer}>
-              <Ionicons name="mail-outline" size={20} color={COLORS.secondary} style={styles.inputIcon} />
-              <TextInput
-                style={styles.input}
-                placeholder="E-mail"
-                placeholderTextColor={COLORS.textSecondary}
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                error={!!errors.email}
-                disabled={isLoading}
-              />
-            </View>
-            {errors.email && <HelperText type="error">{errors.email}</HelperText>}
-            
-            <View style={styles.inputContainer}>
-              <Ionicons name="lock-closed-outline" size={20} color={COLORS.secondary} style={styles.inputIcon} />
-              <TextInput
-                style={styles.input}
-                placeholder="Senha"
-                placeholderTextColor={COLORS.textSecondary}
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry
-                error={!!errors.password}
-                disabled={isLoading}
-              />
-            </View>
-            {errors.password && <HelperText type="error">{errors.password}</HelperText>}
-            
-            <View style={styles.inputContainer}>
-              <Ionicons name="lock-closed-outline" size={20} color={COLORS.secondary} style={styles.inputIcon} />
-              <TextInput
-                style={styles.input}
-                placeholder="Confirmar senha"
-                placeholderTextColor={COLORS.textSecondary}
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-                secureTextEntry
-                error={!!errors.confirmPassword}
-                disabled={isLoading}
-              />
-            </View>
-            {errors.confirmPassword && <HelperText type="error">{errors.confirmPassword}</HelperText>}
-          </>
-        );
-      
-      case 1:
-        return (
-          <>
-            <Text style={styles.stepTitle}>Informações pessoais</Text>
-            <Text style={styles.stepDescription}>
-              Estas informações nos ajudam a personalizar sua experiência
-            </Text>
             
             <View style={styles.inputContainer}>
               <Ionicons name="call-outline" size={20} color={COLORS.secondary} style={styles.inputIcon} />
@@ -388,12 +323,12 @@ export default function RegisterScreen() {
           </>
         );
       
-      case 2:
+      case 1:
         return (
           <>
             <Text style={styles.stepTitle}>Informações financeiras</Text>
             <Text style={styles.stepDescription}>
-              Estas informações nos ajudam a personalizar suas metas financeiras
+              Atualize suas informações financeiras
             </Text>
             
             <View style={styles.inputContainer}>
@@ -553,141 +488,211 @@ export default function RegisterScreen() {
           </>
         );
       
+      case 2:
+        return (
+          <>
+            <Text style={styles.stepTitle}>Confirmar alterações</Text>
+            <Text style={styles.stepDescription}>
+              Digite sua senha para confirmar as alterações
+            </Text>
+            
+            <View style={styles.summaryContainer}>
+              <Text style={styles.summaryTitle}>Resumo das alterações:</Text>
+              
+              <View style={styles.summaryItem}>
+                <Text style={styles.summaryLabel}>Nome:</Text>
+                <Text style={styles.summaryValue}>{name}</Text>
+              </View>
+              
+              <View style={styles.summaryItem}>
+                <Text style={styles.summaryLabel}>Telefone:</Text>
+                <Text style={styles.summaryValue}>{phone}</Text>
+              </View>
+              
+              <View style={styles.summaryItem}>
+                <Text style={styles.summaryLabel}>Profissão:</Text>
+                <Text style={styles.summaryValue}>{profession}</Text>
+              </View>
+              
+              <View style={styles.summaryItem}>
+                <Text style={styles.summaryLabel}>Renda mensal:</Text>
+                <Text style={styles.summaryValue}>
+                  {monthlyIncome === 'ate_2000' && 'Até R$ 2.000'}
+                  {monthlyIncome === '2000_5000' && 'R$ 2.000 a R$ 5.000'}
+                  {monthlyIncome === '5000_10000' && 'R$ 5.000 a R$ 10.000'}
+                  {monthlyIncome === 'acima_10000' && 'Acima de R$ 10.000'}
+                </Text>
+              </View>
+              
+              <View style={styles.summaryItem}>
+                <Text style={styles.summaryLabel}>Objetivo:</Text>
+                <Text style={styles.summaryValue}>
+                  {financialGoal === 'economizar' && 'Economizar'}
+                  {financialGoal === 'investir' && 'Investir'}
+                  {financialGoal === 'controlar_gastos' && 'Controlar gastos'}
+                  {financialGoal === 'quitar_dividas' && 'Quitar dívidas'}
+                </Text>
+              </View>
+            </View>
+            
+            <View style={styles.inputContainer}>
+              <Ionicons name="lock-closed-outline" size={20} color={COLORS.secondary} style={styles.inputIcon} />
+              <TextInput
+                style={styles.input}
+                placeholder="Digite sua senha para confirmar"
+                placeholderTextColor={COLORS.textSecondary}
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+                error={!!errors.password}
+                disabled={isLoading}
+              />
+            </View>
+            {errors.password && <HelperText type="error">{errors.password}</HelperText>}
+            
+            {errors.general && (
+              <View style={styles.errorContainer}>
+                <Text style={styles.errorText}>{errors.general}</Text>
+              </View>
+            )}
+          </>
+        );
+      
       default:
         return null;
     }
   };
-
+  
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-      keyboardVerticalOffset={Platform.OS === "ios" ? 64 : 0}
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={handleClose}
     >
-      <LinearGradient
-        colors={[COLORS.secondary, COLORS.primary]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.header}
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 64 : 0}
       >
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={handleBack}
-          disabled={isLoading}
-        >
-          <Ionicons name="arrow-back" size={22} color={COLORS.white} />
-        </TouchableOpacity>
-        
-        <Text style={styles.title}>Crie sua conta</Text>
-        <StepIndicator currentStep={currentStep} totalSteps={totalSteps} />
-      </LinearGradient>
-      
-      <ScrollView 
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {errors.general && (
-          <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>{errors.general}</Text>
-          </View>
-        )}
-        
-        {renderStep()}
-        
-        <View style={styles.buttonContainer}>
-          <TouchableOpacity
-            onPress={handleNext}
-            disabled={isLoading}
-            activeOpacity={0.8}
-            style={styles.nextButton}
+        <View style={styles.modalContent}>
+          <LinearGradient
+            colors={[COLORS.secondary, COLORS.primary]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.header}
           >
-            <LinearGradient
-              colors={[COLORS.secondary, COLORS.primary]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.gradientButton}
-            >
-              {isLoading ? (
-                <ActivityIndicator color={COLORS.white} size="small" />
-              ) : (
-                <Text style={styles.buttonText}>
-                  {currentStep === totalSteps - 1 ? 'Cadastrar' : 'Próximo'}
-                </Text>
-              )}
-            </LinearGradient>
-          </TouchableOpacity>
-          
-          {currentStep < totalSteps - 1 && (
-            <TouchableOpacity
-              onPress={() => {
-                if (currentStep === totalSteps - 1) {
-                  handleRegister();
-                } else {
-                  setCurrentStep(totalSteps - 1);
-                }
-              }}
+            <TouchableOpacity 
+              style={styles.closeButton}
+              onPress={handleClose}
               disabled={isLoading}
-              style={styles.skipButton}
             >
-              <Text style={styles.skipText}>Pular para o final</Text>
+              <Ionicons name="close" size={24} color={COLORS.white} />
             </TouchableOpacity>
-          )}
+            
+            <Text style={styles.title}>Editar Perfil</Text>
+            
+            <View style={styles.stepContainer}>
+              {Array.from({ length: 3 }).map((_, index) => (
+                <View 
+                  key={index} 
+                  style={[
+                    styles.stepDot, 
+                    index === currentStep && styles.activeStepDot
+                  ]} 
+                />
+              ))}
+            </View>
+          </LinearGradient>
+          
+          <ScrollView 
+            style={styles.scrollView}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+          >
+            {renderStep()}
+          </ScrollView>
+          
+          <View style={styles.footer}>
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={handleBack}
+              disabled={isLoading}
+            >
+              <Text style={styles.backButtonText}>
+                {currentStep === 0 ? 'Cancelar' : 'Voltar'}
+              </Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              onPress={handleNext}
+              disabled={isLoading}
+              activeOpacity={0.8}
+              style={styles.nextButton}
+            >
+              <LinearGradient
+                colors={[COLORS.secondary, COLORS.primary]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.gradientButton}
+              >
+                {isLoading ? (
+                  <ActivityIndicator color={COLORS.white} size="small" />
+                ) : (
+                  <Text style={styles.buttonText}>
+                    {currentStep === 2 ? 'Salvar' : 'Próximo'}
+                  </Text>
+                )}
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
         </View>
-        
-        <TouchableOpacity
-          onPress={() => router.push('/login')}
-          style={styles.linkContainer}
-          disabled={isLoading}
-        >
-          <Text style={styles.linkText}>
-            Já tem conta? <Text style={styles.linkHighlight}>Faça login</Text>
-          </Text>
-        </TouchableOpacity>
-      </ScrollView>
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </Modal>
   );
-}
+};
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  modalContent: {
+    width: width * 0.9,
+    maxHeight: '90%',
     backgroundColor: COLORS.background,
+    borderRadius: 20,
+    overflow: 'hidden',
   },
   header: {
-    paddingTop: 60,
-    paddingBottom: 30,
-    borderBottomLeftRadius: 30,
-    borderBottomRightRadius: 30,
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    paddingTop: 20,
+    paddingBottom: 15,
     alignItems: 'center',
   },
-  backButton: {
+  closeButton: {
     position: 'absolute',
-    top: 16,
-    left: 16,
+    top: 10,
+    right: 10,
     zIndex: 10,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   title: {
-    fontSize: TYPO.size.xl,
+    fontSize: TYPO.size.lg,
     fontFamily: TYPO.family.bold,
     color: COLORS.white,
-    marginBottom: LAYOUT.spacing.md,
+    marginBottom: LAYOUT.spacing.sm,
   },
   stepContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginTop: LAYOUT.spacing.sm,
+    marginTop: LAYOUT.spacing.xs,
   },
   stepDot: {
     width: 8,
@@ -701,11 +706,10 @@ const styles = StyleSheet.create({
     width: 24,
   },
   scrollView: {
-    flex: 1,
+    maxHeight: '70%',
   },
   scrollContent: {
     padding: LAYOUT.spacing.lg,
-    paddingBottom: LAYOUT.spacing.xl * 2,
   },
   stepTitle: {
     fontSize: TYPO.size.lg,
@@ -780,28 +784,68 @@ const styles = StyleSheet.create({
     color: COLORS.secondary,
     fontFamily: TYPO.family.medium,
   },
+  summaryContainer: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 12,
+    padding: LAYOUT.spacing.md,
+    marginBottom: LAYOUT.spacing.lg,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  summaryTitle: {
+    fontSize: TYPO.size.md,
+    fontFamily: TYPO.family.semibold,
+    color: COLORS.text,
+    marginBottom: LAYOUT.spacing.md,
+  },
+  summaryItem: {
+    flexDirection: 'row',
+    marginBottom: LAYOUT.spacing.sm,
+  },
+  summaryLabel: {
+    fontSize: TYPO.size.sm,
+    fontFamily: TYPO.family.medium,
+    color: COLORS.text,
+    width: 100,
+  },
+  summaryValue: {
+    fontSize: TYPO.size.sm,
+    fontFamily: TYPO.family.regular,
+    color: COLORS.textSecondary,
+    flex: 1,
+  },
   errorContainer: {
     backgroundColor: 'rgba(215, 38, 61, 0.1)',
     borderRadius: 8,
     padding: LAYOUT.spacing.md,
-    marginBottom: LAYOUT.spacing.md,
+    marginTop: LAYOUT.spacing.md,
   },
   errorText: {
     color: COLORS.danger,
     fontFamily: TYPO.family.medium,
     fontSize: TYPO.size.sm,
   },
-  buttonContainer: {
-    marginTop: LAYOUT.spacing.lg,
+  footer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    padding: LAYOUT.spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+  },
+  backButton: {
+    paddingVertical: LAYOUT.spacing.md,
+    paddingHorizontal: LAYOUT.spacing.lg,
+  },
+  backButtonText: {
+    color: COLORS.textSecondary,
+    fontFamily: TYPO.family.medium,
+    fontSize: TYPO.size.md,
   },
   nextButton: {
     borderRadius: 12,
     overflow: 'hidden',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    flex: 1,
+    marginLeft: LAYOUT.spacing.md,
   },
   gradientButton: {
     paddingVertical: LAYOUT.spacing.md,
@@ -813,26 +857,6 @@ const styles = StyleSheet.create({
     fontSize: TYPO.size.md,
     fontFamily: TYPO.family.semibold,
   },
-  skipButton: {
-    alignItems: 'center',
-    padding: LAYOUT.spacing.md,
-  },
-  skipText: {
-    color: COLORS.textSecondary,
-    fontSize: TYPO.size.sm,
-    fontFamily: TYPO.family.medium,
-  },
-  linkContainer: {
-    marginTop: LAYOUT.spacing.lg,
-    alignItems: 'center',
-  },
-  linkText: {
-    color: COLORS.textSecondary,
-    fontSize: TYPO.size.sm,
-    fontFamily: TYPO.family.regular,
-  },
-  linkHighlight: {
-    color: COLORS.secondary,
-    fontFamily: TYPO.family.medium,
-  },
 });
+
+export default EditProfileModal;

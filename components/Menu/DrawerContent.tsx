@@ -40,7 +40,7 @@ const DrawerContent: React.FC<DrawerContentProps> = ({
       key: 'charts',
       label: 'Gráficos',
       icon: 'bar-chart-outline',
-      route: '/charts',
+      route: '/ChartsScreen',
       active: currentRoute === '/charts',
     },
     {

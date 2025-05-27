@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, TouchableOpacity, ScrollView, Dimensions, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, StyleSheet, TouchableOpacity, ScrollView, Dimensions, ActivityIndicator, Animated } from 'react-native';
 import { Text, Button } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -17,6 +17,7 @@ import ExpensePieChart from '../components/Charts/ExpensePieChart';
 import BalanceLineChart from '../components/Charts/BalanceLineChart';
 import IncomeExpenseBarChart from '../components/Charts/IncomeExpenseBarChart';
 import MonthlyReportModal from '../components/Reports/MonthlyReportModal';
+import StickySummaryHeader from '../components/Charts/StickySummaryHeader';
 
 // Serviços
 import { 
@@ -28,6 +29,12 @@ import {
   getBalanceByMonth,
   generateMonthlyReport
 } from '../services/dbService';
+
+// Estilos e utilitários
+import { 
+  formatCurrency, 
+  getMonthAbbreviation 
+} from '../components/Charts/styles';
 
 const { width } = Dimensions.get('window');
 
@@ -51,6 +58,10 @@ const ChartsScreen = () => {
   const [exportLoading, setExportLoading] = useState(false);
   const [reportData, setReportData] = useState<any>(null);
   
+  // Referência para o ScrollView e valor de scroll
+  const scrollViewRef = useRef<ScrollView>(null);
+  const scrollY = useRef(new Animated.Value(0)).current;
+  
   // Carregar dados
   useEffect(() => {
     loadData();
@@ -71,10 +82,10 @@ const ChartsScreen = () => {
       if (selectedPeriod === 'month') {
         // Dados para o gráfico de pizza de despesas
         const expenseCategoriesData = await getExpensesByCategoryAnalysis(userId, selectedYear, selectedMonth);
-        setExpenseData(expenseCategoriesData.map(item => ({
+        setExpenseData(expenseCategoriesData.map((item, index) => ({
           name: item.category,
           value: item.amount,
-          color: getCategoryColor(item.category)
+          color: getCategoryColor(item.category, index)
         })));
         
         // Dados para o gráfico de linha de saldo (últimos 6 meses)
@@ -94,13 +105,13 @@ const ChartsScreen = () => {
         });
         
         setBalanceData(filteredBalances.map(item => ({
-          month: getMonthName(item.month),
+          month: getMonthAbbreviation(item.month),
           balance: item.balance
         })));
         
         // Dados para o gráfico de barras de receitas e despesas
         setIncomeExpenseData(filteredBalances.map(item => ({
-          month: getMonthName(item.month),
+          month: getMonthAbbreviation(item.month),
           income: item.income,
           expense: item.expense
         })));
@@ -120,13 +131,13 @@ const ChartsScreen = () => {
         
         // Dados para o gráfico de linha de saldo (ano inteiro)
         setBalanceData(yearlyBalances.map(item => ({
-          month: getMonthName(item.month),
+          month: getMonthAbbreviation(item.month),
           balance: item.balance
         })));
         
         // Dados para o gráfico de barras de receitas e despesas
         setIncomeExpenseData(yearlyBalances.map(item => ({
-          month: getMonthName(item.month),
+          month: getMonthAbbreviation(item.month),
           income: item.income,
           expense: item.expense
         })));
@@ -163,10 +174,10 @@ const ChartsScreen = () => {
         // Ordenar por valor
         yearExpenses = yearExpenses.sort((a, b) => b.amount - a.amount);
         
-        setExpenseData(yearExpenses.map(item => ({
+        setExpenseData(yearExpenses.map((item, index) => ({
           name: item.category,
           value: item.amount,
-          color: getCategoryColor(item.category)
+          color: getCategoryColor(item.category, index)
         })));
       }
     } catch (error) {
@@ -263,28 +274,36 @@ const ChartsScreen = () => {
     return date.toLocaleString('pt-BR', { month: 'long' });
   };
   
-  const getCategoryColor = (category: string): string => {
+  const getCategoryColor = (category: string, index: number = 0): string => {
     const colors: Record<string, string> = {
-      'Alimentação': COLORS.primary,
-      'Moradia': COLORS.secondary,
-      'Transporte': COLORS.success,
-      'Lazer': COLORS.warning,
-      'Saúde': COLORS.danger,
-      'Educação': '#9C27B0',
-      'Vestuário': '#FF9800',
-      'Outros': COLORS.textSecondary
+      'Alimentação': '#FF6B6B',
+      'Moradia': '#4ECDC4',
+      'Transporte': '#FFD166',
+      'Lazer': '#6A0572',
+      'Saúde': '#1A936F',
+      'Educação': '#3D5A80',
+      'Vestuário': '#F18F01',
+      'Outros': '#8A817C'
     };
     
-    return colors[category] || COLORS.textSecondary;
+    if (colors[category]) {
+      return colors[category];
+    }
+    
+    // Cores de fallback para categorias não mapeadas
+    const fallbackColors = [
+      '#FF6B6B', '#4ECDC4', '#FFD166', '#6A0572', '#1A936F', 
+      '#3D5A80', '#F18F01', '#8A817C', '#5E60CE', '#48BFE3'
+    ];
+    
+    return fallbackColors[index % fallbackColors.length];
   };
-  
-  // Formatar valores monetários
-  const formatCurrency = (value: number) => {
-    return value.toLocaleString('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    });
-  };
+
+  // Função para lidar com o evento de scroll
+  const handleScroll = Animated.event(
+    [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+    { useNativeDriver: false }
+  );
 
   return (
     <View style={styles.container}>
@@ -321,38 +340,6 @@ const ChartsScreen = () => {
         onYearChange={handleYearChange}
       />
       
-      {/* Cards de resumo */}
-      <View style={styles.summaryContainer}>
-        <View style={styles.summaryCard}>
-          <View style={[styles.iconContainer, { backgroundColor: `${COLORS.success}20` }]}>
-            <Ionicons name="arrow-up" size={20} color={COLORS.success} />
-          </View>
-          <Text style={styles.summaryLabel}>Receitas</Text>
-          <Text style={styles.summaryValue}>{formatCurrency(totalIncome)}</Text>
-        </View>
-        
-        <View style={styles.summaryCard}>
-          <View style={[styles.iconContainer, { backgroundColor: `${COLORS.danger}20` }]}>
-            <Ionicons name="arrow-down" size={20} color={COLORS.danger} />
-          </View>
-          <Text style={styles.summaryLabel}>Despesas</Text>
-          <Text style={styles.summaryValue}>{formatCurrency(totalExpense)}</Text>
-        </View>
-        
-        <View style={styles.summaryCard}>
-          <View style={[styles.iconContainer, { backgroundColor: `${COLORS.primary}20` }]}>
-            <Ionicons name="wallet" size={20} color={COLORS.primary} />
-          </View>
-          <Text style={styles.summaryLabel}>Saldo</Text>
-          <Text style={[
-            styles.summaryValue,
-            balance < 0 && styles.negativeValue
-          ]}>
-            {formatCurrency(balance)}
-          </Text>
-        </View>
-      </View>
-      
       {/* Conteúdo principal */}
       {isLoading ? (
         <View style={styles.loadingContainer}>
@@ -360,63 +347,79 @@ const ChartsScreen = () => {
           <Text style={styles.loadingText}>Carregando dados...</Text>
         </View>
       ) : (
-        <ScrollView 
-          style={styles.content}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Gráfico de pizza de despesas por categoria */}
-          <ChartCard
-            title="Despesas por Categoria"
-            subtitle={selectedPeriod === 'month' 
-              ? `${getMonthName(selectedMonth)} de ${selectedYear}` 
-              : `Ano de ${selectedYear}`}
+        <>
+          {/* ScrollView com evento de scroll para o sticky header */}
+          <Animated.ScrollView
+            ref={scrollViewRef}
+            style={styles.scrollView}
+            showsVerticalScrollIndicator={false}
+            onScroll={handleScroll}
+            scrollEventThrottle={16}
           >
-            <ExpensePieChart data={expenseData} />
-          </ChartCard>
-          
-          {/* Gráfico de linha de saldo */}
-          <ChartCard
-            title="Evolução do Saldo"
-            subtitle={selectedPeriod === 'month' 
-              ? 'Últimos 6 meses' 
-              : `Ano de ${selectedYear}`}
-          >
-            <BalanceLineChart data={balanceData} />
-          </ChartCard>
-          
-          {/* Gráfico de barras de receitas e despesas */}
-          <ChartCard
-            title="Receitas vs Despesas"
-            subtitle={selectedPeriod === 'month' 
-              ? 'Últimos 6 meses' 
-              : `Ano de ${selectedYear}`}
-          >
-            <IncomeExpenseBarChart data={incomeExpenseData} />
-          </ChartCard>
-          
-          {/* Botões de ação */}
-          <View style={styles.actionsContainer}>
-            <Button
-              mode="outlined"
-              onPress={() => setIsExportModalVisible(true)}
-              style={styles.actionButton}
-              labelStyle={styles.actionButtonLabel}
-              icon="download"
-            >
-              Exportar Dados
-            </Button>
+            {/* Blocos de resumo (inicialmente visíveis, depois ficam sticky) */}
+            <StickySummaryHeader
+              totalIncome={totalIncome}
+              totalExpense={totalExpense}
+              balance={balance}
+            />
             
-            <Button
-              mode="contained"
-              onPress={handleViewReport}
-              style={styles.actionButton}
-              labelStyle={styles.actionButtonLabel}
-              icon="file-document"
+            {/* Gráfico de pizza de despesas por categoria */}
+            <ChartCard
+              title="Despesas por Categoria"
+              subtitle={selectedPeriod === 'month' 
+                ? `${getMonthName(selectedMonth)} de ${selectedYear}` 
+                : `Ano de ${selectedYear}`}
             >
-              Ver Relatório
-            </Button>
-          </View>
-        </ScrollView>
+              <ExpensePieChart data={expenseData} />
+            </ChartCard>
+            
+            {/* Gráfico de linha de saldo */}
+            <ChartCard
+              title="Evolução do Saldo"
+              subtitle={selectedPeriod === 'month' 
+                ? 'Últimos 6 meses' 
+                : `Ano de ${selectedYear}`}
+            >
+              <BalanceLineChart data={balanceData} />
+            </ChartCard>
+            
+            {/* Gráfico de barras de receitas e despesas */}
+            <ChartCard
+              title="Receitas vs Despesas"
+              subtitle={selectedPeriod === 'month' 
+                ? 'Últimos 6 meses' 
+                : `Ano de ${selectedYear}`}
+            >
+              <IncomeExpenseBarChart data={incomeExpenseData} />
+            </ChartCard>
+            
+            {/* Botões de ação */}
+            <View style={styles.actionsContainer}>
+              <Button
+                mode="outlined"
+                onPress={() => setIsExportModalVisible(true)}
+                style={styles.actionButton}
+                labelStyle={styles.actionButtonLabel}
+                icon="download"
+              >
+                Exportar Dados
+              </Button>
+              
+              <Button
+                mode="contained"
+                onPress={handleViewReport}
+                style={styles.actionButton}
+                labelStyle={styles.actionButtonLabel}
+                icon="file-document"
+              >
+                Ver Relatório
+              </Button>
+            </View>
+            
+            {/* Espaço extra no final para garantir que o último item seja visível */}
+            <View style={styles.bottomPadding} />
+          </Animated.ScrollView>
+        </>
       )}
       
       {/* Modal de exportação */}
@@ -481,53 +484,13 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.8)',
     textAlign: 'center',
   },
-  summaryContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginHorizontal: LAYOUT.spacing.md,
-    marginTop: -LAYOUT.spacing.xl,
-    marginBottom: LAYOUT.spacing.md,
-  },
-  summaryCard: {
+  scrollView: {
     flex: 1,
-    backgroundColor: COLORS.surface,
-    borderRadius: LAYOUT.radius.medium,
-    padding: LAYOUT.spacing.sm,
-    marginHorizontal: LAYOUT.spacing.xs,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    alignItems: 'center',
-  },
-  iconContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: LAYOUT.spacing.xs,
-  },
-  summaryLabel: {
-    fontSize: TYPO.size.xs,
-    fontFamily: TYPO.family.medium,
-    color: COLORS.textSecondary,
-    marginBottom: LAYOUT.spacing.xs,
-  },
-  summaryValue: {
-    fontSize: TYPO.size.sm,
-    fontFamily: TYPO.family.semibold,
-    color: COLORS.text,
-  },
-  negativeValue: {
-    color: COLORS.danger,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: LAYOUT.spacing.xl,
   },
   loadingText: {
     marginTop: LAYOUT.spacing.md,
@@ -535,24 +498,23 @@ const styles = StyleSheet.create({
     fontFamily: TYPO.family.medium,
     color: COLORS.textSecondary,
   },
-  content: {
-    flex: 1,
-    paddingHorizontal: LAYOUT.spacing.md,
-  },
   actionsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginVertical: LAYOUT.spacing.lg,
-    paddingBottom: LAYOUT.spacing.xl,
+    marginHorizontal: LAYOUT.spacing.md,
+    marginBottom: LAYOUT.spacing.xl,
+    marginTop: LAYOUT.spacing.md,
   },
   actionButton: {
     flex: 1,
     marginHorizontal: LAYOUT.spacing.xs,
-    borderRadius: LAYOUT.radius.medium,
   },
   actionButtonLabel: {
     fontSize: TYPO.size.sm,
     fontFamily: TYPO.family.medium,
+  },
+  bottomPadding: {
+    height: 40, // Espaço extra no final do ScrollView
   },
 });
 

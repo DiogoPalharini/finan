@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { View, StyleSheet, Dimensions } from 'react-native';
 import { Text } from 'react-native-paper';
 import { PieChart } from 'react-native-chart-kit';
 import { COLORS } from '../../src/styles/colors';
 import { TYPO } from '../../src/styles/typography';
 import { LAYOUT } from '../../src/styles/layout';
+import { getCategoryColor, getChartDimensions, formatCurrency, isSmallScreen } from './styles';
 
 interface ExpensePieChartProps {
   data: {
@@ -14,24 +15,22 @@ interface ExpensePieChartProps {
   }[];
 }
 
-const { width } = Dimensions.get('window');
-const chartWidth = width - 60;
-
 const ExpensePieChart: React.FC<ExpensePieChartProps> = ({ data }) => {
-  const [chartData, setChartData] = useState<any[]>([]);
-  const [totalValue, setTotalValue] = useState(0);
+  const [chartData, setChartData] = React.useState<any[]>([]);
+  const [totalValue, setTotalValue] = React.useState(0);
+  const { chartWidth, pieChartHeight } = getChartDimensions();
   
-  useEffect(() => {
+  React.useEffect(() => {
     if (data && data.length > 0) {
       // Calcular valor total
       const total = data.reduce((sum, item) => sum + item.value, 0);
       setTotalValue(total);
       
-      // Preparar dados para o gráfico
-      const formattedData = data.map(item => ({
+      // Preparar dados para o gráfico com cores da nova paleta
+      const formattedData = data.map((item, index) => ({
         name: item.name,
-        population: item.value, // Alterado de 'value' para 'population' para compatibilidade
-        color: item.color,
+        population: item.value,
+        color: getCategoryColor(item.name, index),
         legendFontColor: COLORS.text,
         legendFontSize: 12,
       }));
@@ -42,7 +41,7 @@ const ExpensePieChart: React.FC<ExpensePieChartProps> = ({ data }) => {
       setChartData([
         {
           name: 'Sem dados',
-          population: 1, // Alterado de 'value' para 'population' para compatibilidade
+          population: 1,
           color: COLORS.divider,
           legendFontColor: COLORS.textSecondary,
           legendFontSize: 12,
@@ -52,14 +51,6 @@ const ExpensePieChart: React.FC<ExpensePieChartProps> = ({ data }) => {
     }
   }, [data]);
 
-  // Formatar valores monetários
-  const formatCurrency = (value: number) => {
-    return value.toLocaleString('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    });
-  };
-
   return (
     <View style={styles.container}>
       {chartData.length > 0 ? (
@@ -68,7 +59,7 @@ const ExpensePieChart: React.FC<ExpensePieChartProps> = ({ data }) => {
             <PieChart
               data={chartData}
               width={chartWidth}
-              height={220}
+              height={pieChartHeight}
               chartConfig={{
                 backgroundColor: COLORS.surface,
                 backgroundGradientFrom: COLORS.surface,
@@ -78,12 +69,16 @@ const ExpensePieChart: React.FC<ExpensePieChartProps> = ({ data }) => {
                 style: {
                   borderRadius: 16,
                 },
+                propsForLabels: {
+                  fontSize: isSmallScreen ? 10 : 12,
+                },
               }}
-              accessor="population" // Alterado de 'value' para 'population' para compatibilidade
+              accessor="population"
               backgroundColor="transparent"
-              paddingLeft="15"
+              paddingLeft={isSmallScreen ? "10" : "15"}
               absolute
               hasLegend={false}
+              avoidFalseZero
             />
             
             <View style={styles.centerLabel}>
@@ -95,7 +90,12 @@ const ExpensePieChart: React.FC<ExpensePieChartProps> = ({ data }) => {
           <View style={styles.legendContainer}>
             {data.map((item, index) => (
               <View key={index} style={styles.legendItem}>
-                <View style={[styles.legendColor, { backgroundColor: item.color }]} />
+                <View 
+                  style={[
+                    styles.legendColor, 
+                    { backgroundColor: getCategoryColor(item.name, index) }
+                  ]} 
+                />
                 <Text style={styles.legendName} numberOfLines={1}>{item.name}</Text>
                 <Text style={styles.legendValue}>{formatCurrency(item.value)}</Text>
               </View>
@@ -115,11 +115,13 @@ const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
     paddingVertical: LAYOUT.spacing.md,
+    width: '100%',
   },
   chartContainer: {
     position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
+    width: '100%',
   },
   centerLabel: {
     position: 'absolute',
@@ -139,11 +141,15 @@ const styles = StyleSheet.create({
   legendContainer: {
     width: '100%',
     marginTop: LAYOUT.spacing.md,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
   },
   legendItem: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: LAYOUT.spacing.xs,
+    width: '48%',
   },
   legendColor: {
     width: 12,

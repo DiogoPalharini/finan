@@ -1,7 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, TouchableOpacity } from 'react-native';
-import { Text } from 'react-native-paper';
-import { Ionicons } from '@expo/vector-icons';
+import { Text, Card } from 'react-native-paper';
 import { COLORS } from '../../src/styles/colors';
 import { LAYOUT } from '../../src/styles/layout';
 import { TYPO } from '../../src/styles/typography';
@@ -10,73 +9,67 @@ interface ChartCardProps {
   title: string;
   subtitle?: string;
   children: React.ReactNode;
-  onExport?: () => void;
-  onFilter?: () => void;
-  height?: number;
+  onPress?: () => void;
 }
 
 const ChartCard: React.FC<ChartCardProps> = ({
   title,
   subtitle,
   children,
-  onExport,
-  onFilter,
-  height = 300
+  onPress,
 }) => {
   return (
-    <View style={[styles.container, { height: height + 80 }]}>
-      <View style={styles.header}>
-        <View style={styles.titleContainer}>
-          <Text style={styles.title}>{title}</Text>
-          {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
+    <Card
+      style={styles.card}
+      onPress={onPress}
+    >
+      <Card.Content style={styles.content}>
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.title}>{title}</Text>
+            {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
+          </View>
+          
+          {onPress && (
+            <TouchableOpacity
+              style={styles.moreButton}
+              onPress={onPress}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.moreButtonText}>Ver mais</Text>
+            </TouchableOpacity>
+          )}
         </View>
         
-        <View style={styles.actions}>
-          {onFilter && (
-            <TouchableOpacity 
-              style={styles.actionButton}
-              onPress={onFilter}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="filter-outline" size={20} color={COLORS.textSecondary} />
-            </TouchableOpacity>
-          )}
-          
-          {onExport && (
-            <TouchableOpacity 
-              style={styles.actionButton}
-              onPress={onExport}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="download-outline" size={20} color={COLORS.textSecondary} />
-            </TouchableOpacity>
-          )}
+        <View style={styles.chartContainer}>
+          {children}
         </View>
-      </View>
-      
-      <View style={[styles.chartContainer, { height }]}>
-        {children}
-      </View>
-    </View>
+      </Card.Content>
+    </Card>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  card: {
+    marginHorizontal: LAYOUT.spacing.md,
+    marginBottom: LAYOUT.spacing.md,
+    borderRadius: LAYOUT.radius.large,
     backgroundColor: COLORS.surface,
-    borderRadius: LAYOUT.radius.lg,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    overflow: 'hidden',
+  },
+  content: {
     padding: LAYOUT.spacing.md,
-    marginBottom: LAYOUT.spacing.lg,
-    ...LAYOUT.shadow.medium,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: LAYOUT.spacing.md,
-  },
-  titleContainer: {
-    flex: 1,
   },
   title: {
     fontSize: TYPO.size.md,
@@ -89,21 +82,19 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     marginTop: 2,
   },
-  actions: {
-    flexDirection: 'row',
+  moreButton: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: LAYOUT.radius.small,
+    backgroundColor: `${COLORS.primary}10`,
   },
-  actionButton: {
-    width: 36,
-    height: 36,
-    borderRadius: LAYOUT.radius.sm,
-    backgroundColor: 'rgba(108, 99, 255, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: LAYOUT.spacing.sm,
+  moreButtonText: {
+    fontSize: TYPO.size.xs,
+    fontFamily: TYPO.family.medium,
+    color: COLORS.primary,
   },
   chartContainer: {
-    flex: 1,
-    justifyContent: 'center',
+    width: '100%',
     alignItems: 'center',
   },
 });

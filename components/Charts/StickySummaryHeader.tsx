@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../../src/styles/colors';
 import { LAYOUT } from '../../src/styles/layout';
 import { TYPO } from '../../src/styles/typography';
-import { formatCurrency } from './styles';
+import { formatCurrency, CHART_COLORS } from './styles';
 
 interface SummaryBlockProps {
   totalIncome: number;
@@ -24,24 +24,24 @@ const SummaryBlock: React.FC<SummaryBlockProps> = ({
   return (
     <View style={[styles.summaryContainer, isSmallScreen && styles.summaryContainerSmall]}>
       <View style={styles.summaryCard}>
-        <View style={[styles.iconContainer, { backgroundColor: `${COLORS.success}20` }]}>
-          <Ionicons name="arrow-up" size={20} color={COLORS.success} />
+        <View style={[styles.iconContainer, { backgroundColor: `${CHART_COLORS.income}20` }]}>
+          <Ionicons name="arrow-up" size={20} color={CHART_COLORS.income} />
         </View>
         <Text style={styles.summaryLabel}>Receitas</Text>
         <Text style={styles.summaryValue}>{formatCurrency(totalIncome)}</Text>
       </View>
       
       <View style={styles.summaryCard}>
-        <View style={[styles.iconContainer, { backgroundColor: `${COLORS.danger}20` }]}>
-          <Ionicons name="arrow-down" size={20} color={COLORS.danger} />
+        <View style={[styles.iconContainer, { backgroundColor: `${CHART_COLORS.expense}20` }]}>
+          <Ionicons name="arrow-down" size={20} color={CHART_COLORS.expense} />
         </View>
         <Text style={styles.summaryLabel}>Despesas</Text>
         <Text style={styles.summaryValue}>{formatCurrency(totalExpense)}</Text>
       </View>
       
       <View style={styles.summaryCard}>
-        <View style={[styles.iconContainer, { backgroundColor: `${COLORS.primary}20` }]}>
-          <Ionicons name="wallet" size={20} color={COLORS.primary} />
+        <View style={[styles.iconContainer, { backgroundColor: `${CHART_COLORS.balance}20` }]}>
+          <Ionicons name="wallet" size={20} color={CHART_COLORS.balance} />
         </View>
         <Text style={styles.summaryLabel}>Saldo</Text>
         <Text style={[
@@ -166,7 +166,7 @@ const styles = StyleSheet.create({
     color: COLORS.text,
   },
   negativeValue: {
-    color: COLORS.danger,
+    color: CHART_COLORS.expense,
   },
   stickyHeader: {
     position: 'absolute',

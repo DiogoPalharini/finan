@@ -14,6 +14,7 @@ import TransactionList from '../components/TransactionList';
 import IncomeModal from '../components/IncomeModal';
 import ExpenseModal from '../components/ExpenseModal';
 import DeleteConfirmationModal from '../components/DeleteConfirmationModal';
+import SettingsModal from '../components/SettingsModal';
 
 // Estilos e constantes
 import { COLORS } from '../src/styles/colors';
@@ -102,6 +103,8 @@ export default function HomeScreen() {
   const [deleteModalVisible, setDeleteModalVisible] = useState<boolean>(false);
   const [itemToDelete, setItemToDelete] = useState<Transaction | null>(null);
   const [fabOpen, setFabOpen] = useState<boolean>(false);
+  const [settingsVisible, setSettingsVisible] = useState(false);
+  const [balanceView, setBalanceView] = useState<'mes_atual' | 'periodo' | 'total'>('mes_atual');
 
   // Carregar transações
   useEffect(() => {
@@ -307,13 +310,24 @@ export default function HomeScreen() {
     
   const balance = totalIncome - totalExpense;
 
+  // Filtro de saldo (apenas lógica base, ajuste conforme necessário)
+  let displayedTransactions = filteredTransactions;
+  if (balanceView === 'mes_atual') {
+    const now = new Date();
+    displayedTransactions = filteredTransactions.filter(t => {
+      const d = new Date(t.date);
+      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+    });
+  }
+  // TODO: Implementar filtro para 'periodo' e 'total' se necessário
+
   return (
     <View style={styles.container}>
       {/* Cabeçalho */}
       <View style={styles.header}>
         <Title style={styles.headerTitle}>Olá, {user?.displayName || 'Usuário'}</Title>
         
-        <TouchableOpacity style={styles.settingsButton}>
+        <TouchableOpacity style={styles.settingsButton} onPress={() => setSettingsVisible(true)}>
           <Ionicons name="settings-outline" size={24} color={COLORS.text} />
         </TouchableOpacity>
       </View>
@@ -387,7 +401,7 @@ export default function HomeScreen() {
       {/* Lista de Transações */}
       <TransactionList 
         isLoading={isLoading}
-        transactions={filteredTransactions}
+        transactions={displayedTransactions}
         formatCurrency={formatCurrency}
         formatDate={formatDate}
         onLongPressItem={confirmDelete}
@@ -448,6 +462,13 @@ export default function HomeScreen() {
         isLoading={isLoading}
         itemType={itemToDelete?.type || 'expense'}
         itemDescription={itemToDelete?.description || ''}
+      />
+
+      <SettingsModal
+        visible={settingsVisible}
+        onClose={() => setSettingsVisible(false)}
+        balanceView={balanceView}
+        onChangeBalanceView={setBalanceView}
       />
     </View>
   );

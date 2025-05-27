@@ -1,4 +1,4 @@
-// app/LoginScreen.tsx
+// app/LoginScreen.tsx - Alternativa 2
 import React, { useState } from 'react';
 import {
   View,
@@ -7,9 +7,10 @@ import {
   Platform,
   Keyboard,
   StyleSheet,
-  Dimensions
+  Dimensions,
+  SafeAreaView
 } from 'react-native';
-import { TextInput, Button, Text } from 'react-native-paper';
+import { TextInput, Button, Text, Card } from 'react-native-paper';
 import { useRouter } from 'expo-router';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../config/firebaseConfig';
@@ -37,84 +38,115 @@ export default function LoginScreen() {
   };
 
   return (
-    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.container}
-      >
-        <Title style={styles.title}>Acesse sua Conta</Title>
-        <Text style={styles.subtitle}>Informe seu e‑mail e senha</Text>
-
-        <TextInput
-          mode="flat"
-          label="E‑mail"
-          value={email}
-          onChangeText={setEmail}
-          keyboardType="email-address"
-          autoCapitalize="none"
-          left={<TextInput.Icon name="email-outline" color={COLORS.primary} />}
-          style={styles.input}
-          textColor={COLORS.inputText} // <- Aqui
-          theme={{
-            colors: {
-              primary: COLORS.primary,
-              background: COLORS.surface,
-              text: COLORS.inputText,
-              placeholder: COLORS.textSecondary,
-            },
-          }}
-        />
-
-        <TextInput
-          mode="flat"
-          label="Senha"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-          left={<TextInput.Icon name="lock-outline" color={COLORS.primary} />}
-          style={styles.input}
-          textColor={COLORS.inputText} // <- Aqui
-          theme={{
-            colors: {
-              primary: COLORS.primary,
-              background: COLORS.surface,
-              text: COLORS.inputText,
-              placeholder: COLORS.textSecondary,
-            },
-          }}
-        />
-
-        <Button
-          mode="contained"
-          onPress={handleLogin}
-          loading={loading}
-          disabled={loading}
-          contentStyle={styles.buttonContent}
-          labelStyle={styles.buttonLabel}
-          style={styles.button}
+    <SafeAreaView style={styles.safeArea}>
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.container}
         >
-          Entrar
-        </Button>
+          <View style={styles.logoContainer}>
+            <Title style={styles.appTitle}>Finan</Title>
+          </View>
+          
+          <Card style={styles.card}>
+            <Card.Content style={styles.cardContent}>
+              <Title style={styles.title}>Acesse sua Conta</Title>
+              <Text style={styles.subtitle}>Informe seu e‑mail e senha</Text>
 
-        <View style={styles.linkWrapper}>
-          <Text style={styles.linkText}>
-            Ainda não tem conta?{' '}
-            <Text style={styles.link} onPress={() => router.push('/SignUpScreen')}>
-              Cadastre‑se
+              <TextInput
+                mode="flat"
+                label="E‑mail"
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                left={<TextInput.Icon icon="email-outline" color={COLORS.primary} />}
+                style={styles.input}
+                textColor={COLORS.inputText}
+                theme={{
+                  colors: {
+                    primary: COLORS.primary,
+                    background: COLORS.surface,
+                    text: COLORS.inputText,
+                    placeholder: COLORS.textSecondary,
+                  },
+                }}
+              />
+
+              <TextInput
+                mode="flat"
+                label="Senha"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+                left={<TextInput.Icon icon="lock-outline" color={COLORS.primary} />}
+                style={styles.input}
+                textColor={COLORS.inputText}
+                theme={{
+                  colors: {
+                    primary: COLORS.primary,
+                    background: COLORS.surface,
+                    text: COLORS.inputText,
+                    placeholder: COLORS.textSecondary,
+                  },
+                }}
+              />
+
+              <Button
+                mode="contained"
+                onPress={handleLogin}
+                loading={loading}
+                disabled={loading}
+                contentStyle={styles.buttonContent}
+                labelStyle={styles.buttonLabel}
+                style={styles.button}
+              >
+                Entrar
+              </Button>
+            </Card.Content>
+          </Card>
+
+          <View style={styles.registerContainer}>
+            <Text style={styles.linkText}>
+              Ainda não tem conta?{' '}
+              <Text style={styles.link} onPress={() => router.push('/SignUpScreen')}>
+                Cadastre‑se
+              </Text>
             </Text>
-          </Text>
-        </View>
-      </KeyboardAvoidingView>
-    </TouchableWithoutFeedback>
+          </View>
+        </KeyboardAvoidingView>
+      </TouchableWithoutFeedback>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
     backgroundColor: COLORS.background,
+  },
+  container: {
+    flex: 1,
     padding: LAYOUT.spacing.md,
-    justifyContent: 'center',
+    justifyContent: 'space-between',
+  },
+  logoContainer: {
+    alignItems: 'center',
+    marginTop: LAYOUT.spacing.xl,
+  },
+  appTitle: {
+    fontSize: TYPO.size.xxl,
+    fontFamily: TYPO.family.bold,
+    color: COLORS.primary,
+  },
+  card: {
+    width: '100%',
+    borderRadius: LAYOUT.radius.large,
+    elevation: 4,
+    backgroundColor: COLORS.surface,
+  },
+  cardContent: {
+    padding: LAYOUT.spacing.md,
   },
   title: {
     fontSize: TYPO.size.xl,
@@ -137,9 +169,9 @@ const styles = StyleSheet.create({
   },
   button: {
     borderRadius: LAYOUT.radius.large,
-    width: SCREEN_WIDTH * 0.8,
+    marginTop: LAYOUT.spacing.md,
+    width: '100%',
     alignSelf: 'center',
-    marginBottom: LAYOUT.spacing.lg,
   },
   buttonContent: {
     height: 56,
@@ -150,8 +182,9 @@ const styles = StyleSheet.create({
     fontFamily: TYPO.family.medium,
     color: COLORS.surface,
   },
-  linkWrapper: {
+  registerContainer: {
     alignItems: 'center',
+    marginBottom: LAYOUT.spacing.xl,
   },
   linkText: {
     fontSize: TYPO.size.sm,

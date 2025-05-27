@@ -1,7 +1,7 @@
 import React from 'react';
-import { View, StyleSheet, Dimensions } from 'react-native';
+import { View, StyleSheet, Dimensions, ScrollView } from 'react-native';
 import { Text } from 'react-native-paper';
-import { BarChart } from 'react-native-chart-kit';
+import { StackedBarChart } from 'react-native-chart-kit';
 import { COLORS } from '../../src/styles/colors';
 import { LAYOUT } from '../../src/styles/layout';
 import { TYPO } from '../../src/styles/typography';
@@ -26,22 +26,15 @@ const IncomeExpenseBarChart: React.FC<IncomeExpenseBarChartProps> = ({
   const finalWidth = width || chartWidth;
   const finalHeight = height || barChartHeight;
   
-  // Preparar dados para o gráfico com meses abreviados
+  // Filtrar dados vazios para melhorar a visualização
+  const filteredData = data.filter(item => item.income > 0 || item.expense > 0);
+  
+  // Preparar dados para o gráfico de barras empilhadas
   const chartData = {
-    labels: data.map(item => item.month.substring(0, 3)), // Abreviação de 3 letras
-    datasets: [
-      {
-        data: data.map(item => item.income),
-        color: (opacity = 1) => `rgba(46, 204, 113, ${opacity})`, // Verde para receitas
-        strokeWidth: 2,
-      },
-      {
-        data: data.map(item => item.expense),
-        color: (opacity = 1) => `rgba(231, 76, 60, ${opacity})`, // Vermelho para despesas
-        strokeWidth: 2,
-      }
-    ],
-    legend: ['Receitas', 'Despesas']
+    labels: filteredData.map(item => item.month.substring(0, 3)), // Abreviação de 3 letras
+    legend: ['Receitas', 'Despesas'],
+    data: filteredData.map(item => [item.income, item.expense]),
+    barColors: [COLORS.success, COLORS.danger]
   };
   
   // Configuração do gráfico
@@ -59,7 +52,8 @@ const IncomeExpenseBarChart: React.FC<IncomeExpenseBarChartProps> = ({
     propsForLabels: {
       fontSize: isSmallScreen ? 8 : 10,
       fontWeight: '500',
-      rotation: isSmallScreen ? 45 : 0, // Rotacionar labels em telas pequenas para evitar sobreposição
+      rotation: isSmallScreen ? -45 : 0,
+      originY: isSmallScreen ? 20 : 0,
     },
     formatYLabel: (value: string) => formatCurrency(Number(value)).replace('R$', ''),
   };
@@ -72,28 +66,25 @@ const IncomeExpenseBarChart: React.FC<IncomeExpenseBarChartProps> = ({
     <View style={styles.container}>
       {data.length > 0 ? (
         <>
-          <BarChart
-            data={chartData}
-            width={finalWidth}
-            height={finalHeight}
-            chartConfig={chartConfig}
-            style={styles.chart}
-            withInnerLines={false}
-            showBarTops={false}
-            fromZero
-            segments={5}
-            yAxisLabel="R$"
-            yAxisInterval={1}
-            horizontalLabelRotation={isSmallScreen ? 45 : 0} // Rotacionar labels em telas pequenas
-            verticalLabelRotation={0}
-            withHorizontalLabels
-            showValuesOnTopOfBars={false}
-            withCustomBarColorFromData={false}
-            flatColor={true}
-            // Configuração para barras empilhadas
-            withHorizontalLines
-            stacked
-          />
+          <ScrollView 
+            horizontal={true} 
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.chartScrollContainer}
+          >
+            <StackedBarChart
+              data={chartData}
+              width={Math.max(finalWidth, filteredData.length * 60)} // Garantir espaço suficiente para barras
+              height={finalHeight}
+              chartConfig={chartConfig}
+              style={styles.chart}
+              withHorizontalLabels
+              showValuesOnTopOfBars={false}
+              withInnerLines={false}
+              segments={5}
+              yAxisLabel="R$"
+              hideLegend={true}
+            />
+          </ScrollView>
           
           <View style={styles.legendContainer}>
             <View style={styles.legendItem}>
@@ -110,7 +101,7 @@ const IncomeExpenseBarChart: React.FC<IncomeExpenseBarChartProps> = ({
         </>
       ) : (
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>Carregando dados...</Text>
+          <Text style={styles.emptyText}>Nenhum dado disponível para este período</Text>
         </View>
       )}
     </View>
@@ -123,6 +114,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: '100%',
   },
+  chartScrollContainer: {
+    paddingBottom: LAYOUT.spacing.sm,
+  },
   chart: {
     borderRadius: LAYOUT.radius.medium,
     marginVertical: LAYOUT.spacing.sm,
@@ -131,9 +125,8 @@ const styles = StyleSheet.create({
     width: '100%',
     flexDirection: 'row',
     justifyContent: 'space-around',
-    alignItems: 'center',
-    marginTop: LAYOUT.spacing.xs,
-    paddingHorizontal: LAYOUT.spacing.sm,
+    marginTop: LAYOUT.spacing.sm,
+    paddingHorizontal: LAYOUT.spacing.md,
   },
   legendItem: {
     flexDirection: 'row',

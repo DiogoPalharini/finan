@@ -5,7 +5,7 @@ import { COLORS } from '../../src/styles/colors';
 // Cores para categorias de despesas - paleta diversificada
 export const CATEGORY_COLORS: Record<string, string> = {
   'Alimentação': '#FF6B6B',
-  'Moradia': '#4ECDC4',
+  'Moradia': '#FF9E7A',
   'Transporte': '#FFD166',
   'Lazer': '#6A0572',
   'Saúde': '#1A936F',
@@ -18,6 +18,18 @@ export const CATEGORY_COLORS: Record<string, string> = {
   'Viagem': '#FB8500'
 };
 
+// Cores principais
+export const CHART_COLORS = {
+  income: '#2ecc71', // Verde para receitas
+  expense: '#e74c3c', // Vermelho para despesas
+  balance: '#3498db', // Azul para saldo
+  balanceNegative: '#e74c3c', // Vermelho para saldo negativo
+  background: '#f8f9fa',
+  grid: '#e9ecef',
+  text: '#343a40',
+  textLight: '#6c757d'
+};
+
 // Função para obter cor baseada na categoria
 export const getCategoryColor = (category: string, index: number = 0): string => {
   if (CATEGORY_COLORS[category]) {
@@ -26,7 +38,7 @@ export const getCategoryColor = (category: string, index: number = 0): string =>
   
   // Cores de fallback para categorias não mapeadas
   const fallbackColors = [
-    '#FF6B6B', '#4ECDC4', '#FFD166', '#6A0572', '#1A936F', 
+    '#FF6B6B', '#FF9E7A', '#FFD166', '#6A0572', '#1A936F', 
     '#3D5A80', '#F18F01', '#8A817C', '#5E60CE', '#48BFE3'
   ];
   
@@ -47,31 +59,10 @@ export const getChartDimensions = () => {
   
   return {
     chartWidth,
-    pieChartHeight: isSmallScreen ? 180 : 220,
-    barChartHeight: isSmallScreen ? 200 : 250,
-    lineChartHeight: isSmallScreen ? 200 : 250,
+    pieChartHeight: isSmallScreen ? 200 : 240,
+    barChartHeight: isSmallScreen ? 220 : 280,
+    lineChartHeight: isSmallScreen ? 220 : 280,
   };
-};
-
-// Configurações de gráficos
-export const chartConfig = {
-  backgroundColor: '#ffffff',
-  backgroundGradientFrom: '#ffffff',
-  backgroundGradientTo: '#ffffff',
-  decimalPlaces: 0,
-  color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
-  labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
-  style: {
-    borderRadius: 16,
-  },
-  propsForDots: {
-    r: '6',
-    strokeWidth: '2',
-  },
-  propsForLabels: {
-    fontSize: isSmallScreen ? 10 : 12,
-  },
-  barPercentage: 0.8,
 };
 
 // Abreviações de meses
@@ -88,4 +79,95 @@ export const formatCurrency = (value: number): string => {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   });
+};
+
+// Formatação de dia do mês para exibição em gráficos
+export const formatDayLabel = (day: number): string => {
+  // Para evitar sobreposição, mostrar apenas alguns dias
+  if (day === 1 || day % 5 === 0 || day === 31) {
+    return day.toString();
+  }
+  return '';
+};
+
+// Tema para Victory Charts
+export const victoryTheme = {
+  axis: {
+    style: {
+      axis: {
+        stroke: CHART_COLORS.text,
+        strokeWidth: 1
+      },
+      axisLabel: {
+        fontSize: 12,
+        padding: 30,
+        fill: CHART_COLORS.text
+      },
+      grid: {
+        stroke: CHART_COLORS.grid,
+        strokeWidth: 1
+      },
+      ticks: {
+        stroke: CHART_COLORS.text,
+        size: 5
+      },
+      tickLabels: {
+        fontSize: isSmallScreen ? 8 : 10,
+        padding: 5,
+        fill: CHART_COLORS.text
+      }
+    }
+  },
+  bar: {
+    style: {
+      data: {
+        fill: CHART_COLORS.income,
+        padding: 8,
+        strokeWidth: 0
+      },
+      labels: {
+        fontSize: 10,
+        fill: CHART_COLORS.text
+      }
+    }
+  },
+  line: {
+    style: {
+      data: {
+        stroke: CHART_COLORS.balance,
+        strokeWidth: 2
+      },
+      labels: {
+        fontSize: 10,
+        fill: CHART_COLORS.text
+      }
+    }
+  },
+  scatter: {
+    style: {
+      data: {
+        fill: CHART_COLORS.balance,
+        stroke: CHART_COLORS.balance,
+        strokeWidth: 2
+      },
+      labels: {
+        fontSize: 10,
+        fill: CHART_COLORS.text,
+        padding: 5
+      }
+    }
+  },
+  pie: {
+    colorScale: Object.values(CATEGORY_COLORS),
+    style: {
+      data: {
+        stroke: "white",
+        strokeWidth: 1
+      },
+      labels: {
+        fontSize: 10,
+        fill: CHART_COLORS.text
+      }
+    }
+  }
 };

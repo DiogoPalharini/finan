@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, TouchableOpacity, ScrollView, Dimensions, ActivityIndicator, Animated } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, StyleSheet, TouchableOpacity, ScrollView, Dimensions, ActivityIndicator } from 'react-native';
 import { Text, Button } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -13,29 +13,25 @@ import { auth } from '../config/firebaseConfig';
 import ChartCard from '../components/Charts/ChartCard';
 import PeriodSelector from '../components/Charts/PeriodSelector';
 import ExportModal from '../components/Charts/ExportModal';
-import ExpensePieChart from '../components/Charts/ExpensePieChart';
-import BalanceLineChart from '../components/Charts/BalanceLineChart';
-import IncomeExpenseBarChart from '../components/Charts/IncomeExpenseBarChart';
 import MonthlyReportModal from '../components/Reports/MonthlyReportModal';
 import StickySummaryHeader from '../components/Charts/StickySummaryHeader';
+
+// Importar os componentes de gráficos corrigidos
+import ExpensePieChart from '../components/Charts/ExpensePieChart';
+import IncomeExpenseBarChart from '../components/Charts/IncomeExpenseBarChart';
 
 // Serviços
 import { 
   getExpensesByCategoryAnalysis, 
-  getMonthlyBalances, 
-  getExpenseTrend,
   getTotalExpensesByMonth,
   getTotalIncomesByMonth,
   getBalanceByMonth,
-  generateMonthlyReport
+  generateMonthlyReport,
+  getExpenses,
+  getIncomes
 } from '../services/dbService';
 
 // Estilos e utilitários
-import { 
-  formatCurrency, 
-  getMonthAbbreviation 
-} from '../components/Charts/styles';
-
 const { width } = Dimensions.get('window');
 
 const ChartsScreen = () => {
@@ -46,7 +42,6 @@ const ChartsScreen = () => {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   
   const [expenseData, setExpenseData] = useState<any[]>([]);
-  const [balanceData, setBalanceData] = useState<any[]>([]);
   const [incomeExpenseData, setIncomeExpenseData] = useState<any[]>([]);
   
   const [totalIncome, setTotalIncome] = useState(0);
@@ -57,10 +52,6 @@ const ChartsScreen = () => {
   const [isReportModalVisible, setIsReportModalVisible] = useState(false);
   const [exportLoading, setExportLoading] = useState(false);
   const [reportData, setReportData] = useState<any>(null);
-  
-  // Referência para o ScrollView e valor de scroll
-  const scrollViewRef = useRef<ScrollView>(null);
-  const scrollY = useRef(new Animated.Value(0)).current;
   
   // Carregar dados
   useEffect(() => {
@@ -88,33 +79,63 @@ const ChartsScreen = () => {
           color: getCategoryColor(item.category, index)
         })));
         
-        // Dados para o gráfico de linha de saldo (últimos 6 meses)
-        const today = new Date(selectedYear, selectedMonth);
-        const sixMonthsAgo = new Date(today);
-        sixMonthsAgo.setMonth(today.getMonth() - 5);
+        // Buscar todas as despesas e receitas do mês
+        const allExpenses = await getExpenses(userId);
+        const allIncomes = await getIncomes(userId);
         
-        const startYear = sixMonthsAgo.getFullYear();
-        const startMonth = sixMonthsAgo.getMonth();
-        
-        const monthlyBalances = await getMonthlyBalances(userId, startYear);
-        
-        // Filtrar apenas os últimos 6 meses
-        const filteredBalances = monthlyBalances.filter(item => {
-          const itemDate = new Date(startYear, item.month);
-          return itemDate >= sixMonthsAgo && itemDate <= today;
+        // Filtrar apenas para o mês selecionado
+        const monthExpenses = allExpenses.filter(expense => {
+          const expenseDate = new Date(expense.date);
+          return expenseDate.getFullYear() === selectedYear && 
+                 expenseDate.getMonth() === selectedMonth;
         });
         
-        setBalanceData(filteredBalances.map(item => ({
-          month: getMonthAbbreviation(item.month),
-          balance: item.balance
-        })));
+        const monthIncomes = allIncomes.filter(income => {
+          const incomeDate = new Date(income.date);
+          return incomeDate.getFullYear() === selectedYear && 
+                 incomeDate.getMonth() === selectedMonth;
+        });
         
-        // Dados para o gráfico de barras de receitas e despesas
-        setIncomeExpenseData(filteredBalances.map(item => ({
-          month: getMonthAbbreviation(item.month),
-          income: item.income,
-          expense: item.expense
-        })));
+        // Agrupar por dia do mês
+        const dailyData: Record<number, {income: number, expense: number}> = {};
+        
+        // Inicializar todos os dias do mês
+        const daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
+        for (let day = 1; day <= daysInMonth; day++) {
+          dailyData[day] = { income: 0, expense: 0 };
+        }
+        
+        // Somar despesas por dia
+        monthExpenses.forEach(expense => {
+          const day = new Date(expense.date).getDate();
+          if (dailyData[day]) {
+            dailyData[day].expense += expense.amount;
+          }
+        });
+        
+        // Somar receitas por dia
+        monthIncomes.forEach(income => {
+          const day = new Date(income.date).getDate();
+          if (dailyData[day]) {
+            dailyData[day].income += income.amount;
+          }
+        });
+        
+        // Dados para o gráfico de barras de receitas e despesas (apenas para o mês selecionado)
+        const dailyIncomeExpenseData = Object.entries(dailyData).map(([day, data]) => ({
+          month: `${day}/${selectedMonth + 1}`,
+          income: data.income,
+          expense: data.expense
+        }));
+        
+        // Ordenar por dia
+        dailyIncomeExpenseData.sort((a, b) => {
+          const dayA = parseInt(a.month.split('/')[0]);
+          const dayB = parseInt(b.month.split('/')[0]);
+          return dayA - dayB;
+        });
+        
+        setIncomeExpenseData(dailyIncomeExpenseData);
         
         // Totais para o mês selecionado
         const income = await getTotalIncomesByMonth(userId, selectedYear, selectedMonth);
@@ -127,24 +148,25 @@ const ChartsScreen = () => {
         
       } else if (selectedPeriod === 'year') {
         // Dados para o ano inteiro
-        const yearlyBalances = await getMonthlyBalances(userId, selectedYear);
+        const monthlyData = [];
         
-        // Dados para o gráfico de linha de saldo (ano inteiro)
-        setBalanceData(yearlyBalances.map(item => ({
-          month: getMonthAbbreviation(item.month),
-          balance: item.balance
-        })));
+        // Preparar dados mensais para o ano
+        for (let month = 0; month < 12; month++) {
+          const income = await getTotalIncomesByMonth(userId, selectedYear, month);
+          const expense = await getTotalExpensesByMonth(userId, selectedYear, month);
+          
+          monthlyData.push({
+            month: getMonthAbbreviation(month),
+            income,
+            expense
+          });
+        }
         
-        // Dados para o gráfico de barras de receitas e despesas
-        setIncomeExpenseData(yearlyBalances.map(item => ({
-          month: getMonthAbbreviation(item.month),
-          income: item.income,
-          expense: item.expense
-        })));
+        setIncomeExpenseData(monthlyData);
         
         // Calcular totais para o ano
-        const yearIncome = yearlyBalances.reduce((sum, item) => sum + item.income, 0);
-        const yearExpense = yearlyBalances.reduce((sum, item) => sum + item.expense, 0);
+        const yearIncome = monthlyData.reduce((sum, item) => sum + item.income, 0);
+        const yearExpense = monthlyData.reduce((sum, item) => sum + item.expense, 0);
         const yearBalance = yearIncome - yearExpense;
         
         setTotalIncome(yearIncome);
@@ -274,36 +296,40 @@ const ChartsScreen = () => {
     return date.toLocaleString('pt-BR', { month: 'long' });
   };
   
+  const getMonthAbbreviation = (month: number): string => {
+    const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+    return monthNames[month];
+  };
+  
   const getCategoryColor = (category: string, index: number = 0): string => {
-    const colors: Record<string, string> = {
+    // Paleta de cores para categorias
+    const categoryColors: Record<string, string> = {
       'Alimentação': '#FF6B6B',
-      'Moradia': '#4ECDC4',
+      'Moradia': '#FF9E7A',
       'Transporte': '#FFD166',
       'Lazer': '#6A0572',
       'Saúde': '#1A936F',
       'Educação': '#3D5A80',
       'Vestuário': '#F18F01',
-      'Outros': '#8A817C'
+      'Outros': '#8A817C',
+      'Serviços': '#5E60CE',
+      'Tecnologia': '#48BFE3',
+      'Investimentos': '#7209B7',
+      'Viagem': '#FB8500'
     };
     
-    if (colors[category]) {
-      return colors[category];
+    if (categoryColors[category]) {
+      return categoryColors[category];
     }
     
     // Cores de fallback para categorias não mapeadas
     const fallbackColors = [
-      '#FF6B6B', '#4ECDC4', '#FFD166', '#6A0572', '#1A936F', 
+      '#FF6B6B', '#FF9E7A', '#FFD166', '#6A0572', '#1A936F', 
       '#3D5A80', '#F18F01', '#8A817C', '#5E60CE', '#48BFE3'
     ];
     
     return fallbackColors[index % fallbackColors.length];
   };
-
-  // Função para lidar com o evento de scroll
-  const handleScroll = Animated.event(
-    [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-    { useNativeDriver: false }
-  );
 
   return (
     <View style={styles.container}>
@@ -348,20 +374,30 @@ const ChartsScreen = () => {
         </View>
       ) : (
         <>
-          {/* ScrollView com evento de scroll para o sticky header */}
-          <Animated.ScrollView
-            ref={scrollViewRef}
+          {/* ScrollView com conteúdo principal */}
+          <ScrollView
             style={styles.scrollView}
             showsVerticalScrollIndicator={false}
-            onScroll={handleScroll}
-            scrollEventThrottle={16}
           >
-            {/* Blocos de resumo (inicialmente visíveis, depois ficam sticky) */}
+            {/* Blocos de resumo */}
             <StickySummaryHeader
               totalIncome={totalIncome}
               totalExpense={totalExpense}
               balance={balance}
             />
+            
+            {/* Gráfico de barras de receitas e despesas */}
+            <ChartCard
+              title="Receitas vs Despesas"
+              subtitle={selectedPeriod === 'month' 
+                ? `${getMonthName(selectedMonth)} de ${selectedYear}` 
+                : `Ano de ${selectedYear}`}
+            >
+              <IncomeExpenseBarChart 
+                data={incomeExpenseData}
+                showMonthlyData={selectedPeriod === 'month'}
+              />
+            </ChartCard>
             
             {/* Gráfico de pizza de despesas por categoria */}
             <ChartCard
@@ -371,26 +407,6 @@ const ChartsScreen = () => {
                 : `Ano de ${selectedYear}`}
             >
               <ExpensePieChart data={expenseData} />
-            </ChartCard>
-            
-            {/* Gráfico de linha de saldo */}
-            <ChartCard
-              title="Evolução do Saldo"
-              subtitle={selectedPeriod === 'month' 
-                ? 'Últimos 6 meses' 
-                : `Ano de ${selectedYear}`}
-            >
-              <BalanceLineChart data={balanceData} />
-            </ChartCard>
-            
-            {/* Gráfico de barras de receitas e despesas */}
-            <ChartCard
-              title="Receitas vs Despesas"
-              subtitle={selectedPeriod === 'month' 
-                ? 'Últimos 6 meses' 
-                : `Ano de ${selectedYear}`}
-            >
-              <IncomeExpenseBarChart data={incomeExpenseData} />
             </ChartCard>
             
             {/* Botões de ação */}
@@ -418,7 +434,7 @@ const ChartsScreen = () => {
             
             {/* Espaço extra no final para garantir que o último item seja visível */}
             <View style={styles.bottomPadding} />
-          </Animated.ScrollView>
+          </ScrollView>
         </>
       )}
       

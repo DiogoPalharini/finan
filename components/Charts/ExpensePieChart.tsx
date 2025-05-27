@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, StyleSheet, Dimensions } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, StyleSheet, Dimensions, ScrollView } from 'react-native';
 import { Text } from 'react-native-paper';
 import { PieChart } from 'react-native-chart-kit';
 import { COLORS } from '../../src/styles/colors';
@@ -16,11 +16,11 @@ interface ExpensePieChartProps {
 }
 
 const ExpensePieChart: React.FC<ExpensePieChartProps> = ({ data }) => {
-  const [chartData, setChartData] = React.useState<any[]>([]);
-  const [totalValue, setTotalValue] = React.useState(0);
+  const [chartData, setChartData] = useState<any[]>([]);
+  const [totalValue, setTotalValue] = useState(0);
   const { chartWidth, pieChartHeight } = getChartDimensions();
   
-  React.useEffect(() => {
+  useEffect(() => {
     if (data && data.length > 0) {
       // Calcular valor total
       const total = data.reduce((sum, item) => sum + item.value, 0);
@@ -87,24 +87,30 @@ const ExpensePieChart: React.FC<ExpensePieChartProps> = ({ data }) => {
             </View>
           </View>
           
-          <View style={styles.legendContainer}>
-            {data.map((item, index) => (
-              <View key={index} style={styles.legendItem}>
-                <View 
-                  style={[
-                    styles.legendColor, 
-                    { backgroundColor: getCategoryColor(item.name, index) }
-                  ]} 
-                />
-                <Text style={styles.legendName} numberOfLines={1}>{item.name}</Text>
-                <Text style={styles.legendValue}>{formatCurrency(item.value)}</Text>
-              </View>
-            ))}
-          </View>
+          <ScrollView 
+            horizontal={true} 
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.legendScrollContainer}
+          >
+            <View style={styles.legendContainer}>
+              {data.map((item, index) => (
+                <View key={index} style={styles.legendItem}>
+                  <View 
+                    style={[
+                      styles.legendColor, 
+                      { backgroundColor: getCategoryColor(item.name, index) }
+                    ]} 
+                  />
+                  <Text style={styles.legendName} numberOfLines={1}>{item.name}</Text>
+                  <Text style={styles.legendValue}>{formatCurrency(item.value)}</Text>
+                </View>
+              ))}
+            </View>
+          </ScrollView>
         </>
       ) : (
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>Carregando dados...</Text>
+          <Text style={styles.emptyText}>Nenhuma despesa registrada neste período</Text>
         </View>
       )}
     </View>
@@ -138,6 +144,10 @@ const styles = StyleSheet.create({
     fontFamily: TYPO.family.semibold,
     color: COLORS.text,
   },
+  legendScrollContainer: {
+    paddingHorizontal: LAYOUT.spacing.sm,
+    paddingBottom: LAYOUT.spacing.xs,
+  },
   legendContainer: {
     width: '100%',
     marginTop: LAYOUT.spacing.md,
@@ -149,7 +159,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: LAYOUT.spacing.xs,
-    width: '48%',
+    marginRight: LAYOUT.spacing.md,
+    minWidth: 150,
   },
   legendColor: {
     width: 12,

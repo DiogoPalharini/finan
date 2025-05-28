@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, Modal, TouchableOpacity, Dimensions } from 'react-native';
+import { View, StyleSheet, Modal, TouchableOpacity, Dimensions, Platform } from 'react-native';
 import { Text, Portal, RadioButton, Divider } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import RecurringEntryForm from './RecurringEntryForm';
 import { COLORS } from '../src/styles/colors';
 import { LAYOUT } from '../src/styles/layout';
@@ -10,15 +11,49 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 const { width } = Dimensions.get('window');
 
+type BalanceViewType = 'mes_atual' | 'periodo' | 'total';
+
 interface SettingsModalProps {
   visible: boolean;
   onClose: () => void;
-  balanceView: string;
-  onChangeBalanceView: (view: string) => void;
+  balanceView: BalanceViewType;
+  onChangeBalanceView: (view: BalanceViewType) => void;
+  periodStart: Date | null;
+  periodEnd: Date | null;
+  onChangePeriod: (start: Date | null, end: Date | null) => void;
 }
 
-const SettingsModal: React.FC<SettingsModalProps> = ({ visible, onClose, balanceView, onChangeBalanceView }) => {
+const SettingsModal: React.FC<SettingsModalProps> = ({
+  visible,
+  onClose,
+  balanceView,
+  onChangeBalanceView,
+  periodStart,
+  periodEnd,
+  onChangePeriod
+}) => {
   const [tab, setTab] = useState<'recorrencias' | 'saldo'>('recorrencias');
+  const [showStartDate, setShowStartDate] = useState(false);
+  const [showEndDate, setShowEndDate] = useState(false);
+
+  const handleStartDateChange = (event: any, selectedDate?: Date) => {
+    setShowStartDate(Platform.OS === 'ios');
+    if (selectedDate) {
+      onChangePeriod(selectedDate, periodEnd);
+    }
+  };
+
+  const handleEndDateChange = (event: any, selectedDate?: Date) => {
+    setShowEndDate(Platform.OS === 'ios');
+    if (selectedDate) {
+      onChangePeriod(periodStart, selectedDate);
+    }
+  };
+
+  const formatarData = (date: Date | null): string => {
+    if (!date) return 'Selecionar data';
+    return date.toLocaleDateString('pt-BR');
+  };
 
   return (
     <Portal>
@@ -51,11 +86,59 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ visible, onClose, balance
               ) : (
                 <View>
                   <Text style={styles.sectionTitle}>Como deseja exibir o saldo?</Text>
-                  <RadioButton.Group onValueChange={onChangeBalanceView} value={balanceView}>
+                  <RadioButton.Group 
+                    onValueChange={(value) => onChangeBalanceView(value as BalanceViewType)} 
+                    value={balanceView}
+                  >
                     <RadioButton.Item label="Apenas mês atual" value="mes_atual" color={COLORS.secondary} labelStyle={styles.radioLabel} />
                     <RadioButton.Item label="Período determinado" value="periodo" color={COLORS.secondary} labelStyle={styles.radioLabel} />
                     <RadioButton.Item label="Total acumulado" value="total" color={COLORS.secondary} labelStyle={styles.radioLabel} />
                   </RadioButton.Group>
+
+                  {balanceView === 'periodo' && (
+                    <View style={styles.periodoContainer}>
+                      <Text style={styles.periodoTitle}>Selecione o período:</Text>
+                      
+                      <TouchableOpacity 
+                        style={styles.datePickerButton}
+                        onPress={() => setShowStartDate(true)}
+                      >
+                        <Ionicons name="calendar-outline" size={20} color={COLORS.secondary} style={styles.inputIcon} />
+                        <Text style={styles.datePickerText}>
+                          {formatarData(periodStart)}
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity 
+                        style={styles.datePickerButton}
+                        onPress={() => setShowEndDate(true)}
+                      >
+                        <Ionicons name="calendar-outline" size={20} color={COLORS.secondary} style={styles.inputIcon} />
+                        <Text style={styles.datePickerText}>
+                          {formatarData(periodEnd)}
+                        </Text>
+                      </TouchableOpacity>
+
+                      {showStartDate && (
+                        <DateTimePicker
+                          value={periodStart || new Date()}
+                          mode="date"
+                          display="default"
+                          onChange={handleStartDateChange}
+                        />
+                      )}
+
+                      {showEndDate && (
+                        <DateTimePicker
+                          value={periodEnd || new Date()}
+                          mode="date"
+                          display="default"
+                          onChange={handleEndDateChange}
+                          minimumDate={periodStart || undefined}
+                        />
+                      )}
+                    </View>
+                  )}
                 </View>
               )}
             </View>
@@ -154,6 +237,43 @@ const styles = StyleSheet.create({
     fontFamily: TYPO.family.regular,
     fontSize: TYPO.size.sm,
     color: COLORS.text,
+  },
+  periodoContainer: {
+    marginTop: LAYOUT.spacing.md,
+    paddingTop: LAYOUT.spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+  },
+  periodoTitle: {
+    fontSize: TYPO.size.sm,
+    fontFamily: TYPO.family.medium,
+    color: COLORS.text,
+    marginBottom: LAYOUT.spacing.sm,
+  },
+  datePickerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.surface,
+    borderRadius: 12,
+    marginBottom: LAYOUT.spacing.xs,
+    paddingHorizontal: LAYOUT.spacing.md,
+    paddingVertical: LAYOUT.spacing.sm,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 1,
+  },
+  datePickerText: {
+    flex: 1,
+    color: COLORS.text,
+    fontSize: TYPO.size.sm,
+    fontFamily: TYPO.family.regular,
+  },
+  inputIcon: {
+    marginRight: LAYOUT.spacing.sm,
   },
 });
 

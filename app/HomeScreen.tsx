@@ -32,6 +32,7 @@ import {
   Expense,
   Income
 } from '../services/dbService';
+import { processarRecorrencias } from '../services/recurringService';
 import { useAuth } from '../hooks/useAuth';
 
 // Tipos
@@ -85,7 +86,9 @@ const formatDate = (dateString: string): string => {
   return format(date, 'dd/MM/yyyy', { locale: ptBR });
 };
 
-export default function HomeScreen() {
+type BalanceViewType = 'mes_atual' | 'periodo' | 'total';
+
+const HomeScreen = () => {
   const router = useRouter();
   const { colors } = useTheme();
   const { user } = useAuth();
@@ -94,7 +97,7 @@ export default function HomeScreen() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<'all' | 'income' | 'expense'>('all');
   
   // Estados para modais
@@ -104,12 +107,23 @@ export default function HomeScreen() {
   const [itemToDelete, setItemToDelete] = useState<Transaction | null>(null);
   const [fabOpen, setFabOpen] = useState<boolean>(false);
   const [settingsVisible, setSettingsVisible] = useState(false);
-  const [balanceView, setBalanceView] = useState<'mes_atual' | 'periodo' | 'total'>('mes_atual');
+  const [balanceView, setBalanceView] = useState<BalanceViewType>('mes_atual');
+  const [periodStart, setPeriodStart] = useState<Date | null>(null);
+  const [periodEnd, setPeriodEnd] = useState<Date | null>(null);
 
   // Carregar transações
   useEffect(() => {
     loadTransactions();
   }, []);
+
+  // Processar recorrências ao abrir o app
+  useEffect(() => {
+    if (user) {
+      processarRecorrencias(user.uid).catch(error => {
+        console.error('Erro ao processar recorrências:', error);
+      });
+    }
+  }, [user]);
   
   // Filtrar transações quando a busca ou filtro mudar
   useEffect(() => {
@@ -299,17 +313,6 @@ export default function HomeScreen() {
     });
   };
 
-  // Calcular totais
-  const totalIncome = transactions
-    .filter(t => t.type === 'income')
-    .reduce((sum, t) => sum + t.amount, 0);
-    
-  const totalExpense = transactions
-    .filter(t => t.type === 'expense')
-    .reduce((sum, t) => sum + t.amount, 0);
-    
-  const balance = totalIncome - totalExpense;
-
   // Filtro de saldo (apenas lógica base, ajuste conforme necessário)
   let displayedTransactions = filteredTransactions;
   if (balanceView === 'mes_atual') {
@@ -318,8 +321,26 @@ export default function HomeScreen() {
       const d = new Date(t.date);
       return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
     });
+  } else if (balanceView === 'periodo' && periodStart) {
+    displayedTransactions = filteredTransactions.filter(t => {
+      const d = new Date(t.date);
+      const start = periodStart;
+      const end = periodEnd || new Date();
+      end.setHours(23, 59, 59, 999); // Incluir todo o último dia
+      return d >= start && d <= end;
+    });
   }
-  // TODO: Implementar filtro para 'periodo' e 'total' se necessário
+
+  // Calcular totais baseado nas transações filtradas
+  const totalIncome = displayedTransactions
+    .filter(t => t.type === 'income')
+    .reduce((sum, t) => sum + t.amount, 0);
+    
+  const totalExpense = displayedTransactions
+    .filter(t => t.type === 'expense')
+    .reduce((sum, t) => sum + t.amount, 0);
+    
+  const balance = totalIncome - totalExpense;
 
   return (
     <View style={styles.container}>
@@ -469,10 +490,16 @@ export default function HomeScreen() {
         onClose={() => setSettingsVisible(false)}
         balanceView={balanceView}
         onChangeBalanceView={setBalanceView}
+        periodStart={periodStart}
+        periodEnd={periodEnd}
+        onChangePeriod={(start, end) => {
+          setPeriodStart(start);
+          setPeriodEnd(end);
+        }}
       />
     </View>
   );
-}
+};
 
 const styles = StyleSheet.create({
   container: {
@@ -527,3 +554,5 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary,
   },
 });
+
+export default HomeScreen;

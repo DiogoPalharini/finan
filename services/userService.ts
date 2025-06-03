@@ -1,10 +1,13 @@
-import { auth, rtdb } from '../config/firebaseConfig';
+// services/userService.ts
+import { rtdb } from '../config/firebaseConfig';
 import { ref, set, get, update } from 'firebase/database';
 import { User, updateProfile } from 'firebase/auth';
+import { getCurrentUser } from './authService';
 
-// Interface para os dados adicionais do usuário
+// Interface para os dados do perfil do usuário
 export interface UserProfile {
   displayName: string;
+  email: string;
   phoneNumber?: string;
   birthDate?: string;
   cpf?: string;
@@ -17,11 +20,16 @@ export interface UserProfile {
   preferredCurrency?: string;
   monthClosingDay?: number;
   notificationPreference?: 'diaria' | 'semanal' | 'mensal' | 'nenhuma';
+  totalBalance: number;
   createdAt: string;
   updatedAt: string;
 }
 
-// Salvar perfil do usuário no Realtime Database
+/**
+ * Salva ou atualiza o perfil do usuário no Realtime Database
+ * @param userId ID do usuário
+ * @param profileData Dados do perfil a serem salvos/atualizados
+ */
 export async function saveUserProfile(userId: string, profileData: Partial<UserProfile>): Promise<void> {
   try {
     const userRef = ref(rtdb, `users/${userId}/profile`);
@@ -37,29 +45,33 @@ export async function saveUserProfile(userId: string, profileData: Partial<UserP
       updatedAt: new Date().toISOString()
     };
     
-    // Se for a primeira vez, adicionar data de criação
+    // Se for a primeira vez, adicionar data de criação e saldo inicial
     if (!existingData.createdAt) {
       updatedData.createdAt = new Date().toISOString();
+      updatedData.totalBalance = updatedData.totalBalance || 0;
     }
     
     // Salvar no banco de dados
     await set(userRef, updatedData);
     
     // Atualizar displayName no Auth se fornecido
-    if (profileData.displayName && auth.currentUser) {
-      await updateProfile(auth.currentUser, {
+    const currentUser = getCurrentUser();
+    if (profileData.displayName && currentUser) {
+      await updateProfile(currentUser, {
         displayName: profileData.displayName
       });
     }
-    
-    return;
   } catch (error) {
     console.error('Erro ao salvar perfil do usuário:', error);
     throw error;
   }
 }
 
-// Obter perfil do usuário
+/**
+ * Obtém o perfil do usuário
+ * @param userId ID do usuário
+ * @returns Objeto com o perfil do usuário ou null se não existir
+ */
 export async function getUserProfile(userId: string): Promise<UserProfile | null> {
   try {
     const userRef = ref(rtdb, `users/${userId}/profile`);
@@ -76,29 +88,39 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
   }
 }
 
-// Atualizar perfil do usuário com verificação de senha
-export async function updateUserProfile(
-  userId: string, 
-  profileData: Partial<UserProfile>, 
-  password: string
-): Promise<void> {
+/**
+ * Atualiza o saldo total do usuário
+ * @param userId ID do usuário
+ * @param amount Valor a ser adicionado (positivo) ou subtraído (negativo)
+ */
+export async function updateUserBalance(userId: string, amount: number): Promise<void> {
   try {
-    // Verificar senha (reautenticação)
-    if (!auth.currentUser || !auth.currentUser.email) {
-      throw new Error('Usuário não autenticado');
+    const userRef = ref(rtdb, `users/${userId}/profile`);
+    const snapshot = await get(userRef);
+    
+    if (!snapshot.exists()) {
+      throw new Error('Perfil do usuário não encontrado');
     }
     
-    // Atualizar perfil
-    await saveUserProfile(userId, profileData);
+    const profile = snapshot.val() as UserProfile;
+    const currentBalance = profile.totalBalance || 0;
+    const newBalance = currentBalance + amount;
     
-    return;
+    await update(userRef, {
+      totalBalance: newBalance,
+      updatedAt: new Date().toISOString()
+    });
   } catch (error) {
-    console.error('Erro ao atualizar perfil do usuário:', error);
+    console.error('Erro ao atualizar saldo do usuário:', error);
     throw error;
   }
 }
 
-// Verificar se o perfil do usuário está completo
+/**
+ * Verifica se o perfil do usuário está completo
+ * @param userId ID do usuário
+ * @returns Boolean indicando se o perfil está completo
+ */
 export async function isProfileComplete(userId: string): Promise<boolean> {
   try {
     const profile = await getUserProfile(userId);
@@ -122,16 +144,17 @@ export async function isProfileComplete(userId: string): Promise<boolean> {
   }
 }
 
-// Obter dados para estatísticas do perfil
-export async function getProfileStats(userId: string): Promise<{
-  goalCount: number;
-  savingsRate: number;
-  monthsActive: number;
-}> {
-  // Implementação futura: obter dados reais
-  return {
-    goalCount: 12,
-    savingsRate: 85,
-    monthsActive: 6
-  };
+/**
+ * Obtém o saldo atual do usuário
+ * @param userId ID do usuário
+ * @returns Saldo atual do usuário
+ */
+export async function getUserBalance(userId: string): Promise<number> {
+  try {
+    const profile = await getUserProfile(userId);
+    return profile?.totalBalance || 0;
+  } catch (error) {
+    console.error('Erro ao obter saldo do usuário:', error);
+    throw error;
+  }
 }

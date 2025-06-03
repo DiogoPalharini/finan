@@ -2,5 +2,12 @@
   "rules": {
     ".read": "now < 1745982000000",  // 2025-4-30
     ".write": "now < 1745982000000",  // 2025-4-30
+    "users": {
+      "$uid": {
+        "transactions": {
+          ".indexOn": ["type", "date"]
+        }
+      }
+    }
   }
 }

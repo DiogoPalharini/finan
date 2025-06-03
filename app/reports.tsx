@@ -13,7 +13,7 @@ import { auth } from '../config/firebaseConfig';
 import MonthlyReportModal from '../components/Reports/MonthlyReportModal';
 
 // Serviços
-import { generateMonthlyReport } from '../services/dbService';
+import { generateMonthlyReport } from '../services/transactionService';
 
 const { width } = Dimensions.get('window');
 

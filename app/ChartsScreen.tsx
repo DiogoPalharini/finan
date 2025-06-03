@@ -22,14 +22,12 @@ import IncomeExpenseBarChart from '../components/Charts/IncomeExpenseBarChart';
 
 // Serviços
 import { 
-  getExpensesByCategoryAnalysis, 
+  getTransactionsByPeriod,
+  getTransactionsByCategory,
   getTotalExpensesByMonth,
   getTotalIncomesByMonth,
-  getBalanceByMonth,
-  generateMonthlyReport,
-  getExpenses,
-  getIncomes
-} from '../services/dbService';
+  getBalanceByMonth
+} from '../services/transactionService';
 
 // Estilos e utilitários
 const { width } = Dimensions.get('window');
@@ -72,7 +70,7 @@ const ChartsScreen = () => {
       // Carregar dados de acordo com o período selecionado
       if (selectedPeriod === 'month') {
         // Dados para o gráfico de pizza de despesas
-        const expenseCategoriesData = await getExpensesByCategoryAnalysis(userId, selectedYear, selectedMonth);
+        const expenseCategoriesData = await getTransactionsByCategory(userId, selectedYear, selectedMonth);
         setExpenseData(expenseCategoriesData.map((item, index) => ({
           name: item.category,
           value: item.amount,
@@ -80,8 +78,8 @@ const ChartsScreen = () => {
         })));
         
         // Buscar todas as despesas e receitas do mês
-        const allExpenses = await getExpenses(userId);
-        const allIncomes = await getIncomes(userId);
+        const allExpenses = await getTransactionsByPeriod(userId, selectedYear, selectedMonth);
+        const allIncomes = await getTransactionsByPeriod(userId, selectedYear, selectedMonth, 'income');
         
         // Filtrar apenas para o mês selecionado
         const monthExpenses = allExpenses.filter(expense => {
@@ -177,7 +175,7 @@ const ChartsScreen = () => {
         let yearExpenses: {category: string, amount: number}[] = [];
         
         for (let month = 0; month < 12; month++) {
-          const monthExpenses = await getExpensesByCategoryAnalysis(userId, selectedYear, month);
+          const monthExpenses = await getTransactionsByCategory(userId, selectedYear, month);
           
           // Agrupar por categoria
           monthExpenses.forEach(item => {

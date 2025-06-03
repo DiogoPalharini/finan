@@ -31,9 +31,16 @@ import {
   deleteIncome,
   Expense,
   Income
-} from '../services/dbService';
+} from '../services/transactionService';
 import { processarRecorrencias } from '../services/recurringService';
 import { useAuth } from '../hooks/useAuth';
+import {
+  getTransactionsByPeriod,
+  getTransactionsByCategory,
+  getTotalExpensesByMonth,
+  getTotalIncomesByMonth,
+  getBalanceByMonth
+} from '../services/transactionService';
 
 // Tipos
 export interface Transaction {

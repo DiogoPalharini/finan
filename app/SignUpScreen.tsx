@@ -10,7 +10,7 @@ import { useRouter } from 'expo-router';
 import { COLORS } from '../src/styles/colors';
 import { LAYOUT } from '../src/styles/layout';
 import { TYPO } from '../src/styles/typography';
-import { signUp } from '../services/authService';
+import { signUp, validatePassword } from '../services/authService';
 import { saveUserProfile } from '../services/userService';
 
 const { width } = Dimensions.get('window');
@@ -65,6 +65,7 @@ export default function RegisterScreen() {
   
   // Estados para validação
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [passwordStrength, setPasswordStrength] = useState<{ isValid: boolean; message: string }>({ isValid: false, message: '' });
 
   // Validar campos da etapa atual
   const validateCurrentStep = (): boolean => {
@@ -80,6 +81,11 @@ export default function RegisterScreen() {
       else if (password.length < 6) newErrors.password = 'Senha deve ter pelo menos 6 caracteres';
       
       if (password !== confirmPassword) newErrors.confirmPassword = 'Senhas não conferem';
+      
+      const passwordValidation = validatePassword(password);
+      if (!passwordValidation.isValid) {
+        newErrors.password = passwordValidation.message;
+      }
     } 
     else if (currentStep === 1) {
       // Validar etapa 2
@@ -177,6 +183,12 @@ export default function RegisterScreen() {
     return formatted;
   };
 
+  const handlePasswordChange = (text: string) => {
+    setPassword(text);
+    const validation = validatePassword(text);
+    setPasswordStrength(validation);
+  };
+
   // Registrar usuário
   const handleRegister = async () => {
     if (!validateCurrentStep()) return;
@@ -265,13 +277,17 @@ export default function RegisterScreen() {
                 placeholder="Senha"
                 placeholderTextColor={COLORS.textSecondary}
                 value={password}
-                onChangeText={setPassword}
+                onChangeText={handlePasswordChange}
                 secureTextEntry
                 error={!!errors.password}
                 disabled={isLoading}
               />
             </View>
-            {errors.password && <HelperText type="error">{errors.password}</HelperText>}
+            {password && (
+              <HelperText type={passwordStrength.isValid ? "info" : "error"}>
+                {passwordStrength.message}
+              </HelperText>
+            )}
             
             <View style={styles.inputContainer}>
               <Ionicons name="lock-closed-outline" size={20} color={COLORS.secondary} style={styles.inputIcon} />

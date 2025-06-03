@@ -13,6 +13,9 @@ const RecurringEntryForm: React.FC = () => {
   const [tipo, setTipo] = useState<'despesa' | 'receita'>('despesa');
   const [valor, setValor] = useState('');
   const [descricao, setDescricao] = useState('');
+  const [categoria, setCategoria] = useState('');
+  const [fonte, setFonte] = useState('');
+  const [diaRecorrencia, setDiaRecorrencia] = useState<number>(1);
   const [dataInicio, setDataInicio] = useState<Date | null>(null);
   const [dataFim, setDataFim] = useState<Date | null>(null);
   const [temDataFim, setTemDataFim] = useState(false);
@@ -35,6 +38,7 @@ const RecurringEntryForm: React.FC = () => {
       setRecorrencias(dados);
     } catch (error) {
       console.error('Erro ao carregar recorrências:', error);
+      Alert.alert('Erro', 'Não foi possível carregar as recorrências');
     }
   };
 
@@ -76,7 +80,10 @@ const RecurringEntryForm: React.FC = () => {
   };
 
   const adicionarRecorrencia = async () => {
-    if (!auth.currentUser || !valor || !descricao || !dataInicio) return;
+    if (!auth.currentUser || !valor || !descricao || !dataInicio) {
+      Alert.alert('Erro', 'Por favor, preencha todos os campos obrigatórios');
+      return;
+    }
     
     setLoading(true);
     try {
@@ -84,6 +91,9 @@ const RecurringEntryForm: React.FC = () => {
         tipo,
         valor: Number(valor),
         descricao,
+        categoria,
+        fonte,
+        diaRecorrencia,
         dataInicio: formatarData(dataInicio),
         dataFim: temDataFim ? formatarData(dataFim) : undefined
       });
@@ -91,11 +101,16 @@ const RecurringEntryForm: React.FC = () => {
       await carregarRecorrencias();
       setValor('');
       setDescricao('');
+      setCategoria('');
+      setFonte('');
+      setDiaRecorrencia(1);
       setDataInicio(null);
       setDataFim(null);
       setTemDataFim(false);
+      Alert.alert('Sucesso', 'Recorrência adicionada com sucesso!');
     } catch (error) {
       console.error('Erro ao salvar recorrência:', error);
+      Alert.alert('Erro', 'Não foi possível salvar a recorrência');
     } finally {
       setLoading(false);
     }
@@ -104,188 +119,215 @@ const RecurringEntryForm: React.FC = () => {
   const excluirRecorrencia = async (id: string) => {
     if (!auth.currentUser) return;
     
-    setLoadingDelete(id);
-    try {
-      await deleteRecorrencia(auth.currentUser.uid, id);
-      await carregarRecorrencias();
-    } catch (error) {
-      console.error('Erro ao excluir recorrência:', error);
-    } finally {
-      setLoadingDelete(null);
-    }
+    Alert.alert(
+      'Confirmar exclusão',
+      'Tem certeza que deseja excluir esta recorrência?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Excluir',
+          style: 'destructive',
+          onPress: async () => {
+            setLoadingDelete(id);
+            try {
+              await deleteRecorrencia(auth.currentUser!.uid, id);
+              await carregarRecorrencias();
+              Alert.alert('Sucesso', 'Recorrência excluída com sucesso!');
+            } catch (error) {
+              console.error('Erro ao excluir recorrência:', error);
+              Alert.alert('Erro', 'Não foi possível excluir a recorrência');
+            } finally {
+              setLoadingDelete(null);
+            }
+          }
+        }
+      ]
+    );
   };
 
   return (
-    <View>
-      <Text style={styles.sectionTitle}>Nova recorrência mensal</Text>
-      
-      <View style={styles.tipoContainer}>
-        <TouchableOpacity
-          style={[styles.tipoButton, tipo === 'despesa' && styles.tipoButtonActive]}
-          onPress={() => setTipo('despesa')}
-        >
-          <Ionicons 
-            name="arrow-down-outline" 
-            size={20} 
-            color={tipo === 'despesa' ? COLORS.white : COLORS.text} 
-          />
-          <Text style={[styles.tipoText, tipo === 'despesa' && styles.tipoTextActive]}>
-            Despesa
-          </Text>
-        </TouchableOpacity>
+    <View style={styles.container}>
+      <View style={styles.formContainer}>
+        <Text style={styles.title}>Nova Recorrência</Text>
         
-        <TouchableOpacity
-          style={[styles.tipoButton, tipo === 'receita' && styles.tipoButtonActive]}
-          onPress={() => setTipo('receita')}
-        >
-          <Ionicons 
-            name="arrow-up-outline" 
-            size={20} 
-            color={tipo === 'receita' ? COLORS.white : COLORS.text} 
-          />
-          <Text style={[styles.tipoText, tipo === 'receita' && styles.tipoTextActive]}>
-            Receita
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.inputContainer}>
-        <Ionicons name="cash-outline" size={20} color={COLORS.secondary} style={styles.inputIcon} />
-        <TextInput
-          placeholder="Valor"
-          value={valor}
-          onChangeText={formatarValor}
-          keyboardType="numeric"
-          style={styles.input}
-          dense
-          mode="flat"
-          underlineColor="transparent"
-          theme={{
-            colors: {
-              primary: COLORS.primary,
-              text: COLORS.text,
-              placeholder: COLORS.textSecondary,
-            },
-          }}
-        />
-      </View>
-
-      <View style={styles.inputContainer}>
-        <Ionicons name="create-outline" size={20} color={COLORS.secondary} style={styles.inputIcon} />
-        <TextInput
-          placeholder="Descrição"
-          value={descricao}
-          onChangeText={setDescricao}
-          style={styles.input}
-          dense
-          mode="flat"
-          underlineColor="transparent"
-          theme={{
-            colors: {
-              primary: COLORS.primary,
-              text: COLORS.text,
-              placeholder: COLORS.textSecondary,
-            },
-          }}
-        />
-      </View>
-
-      <TouchableOpacity 
-        style={styles.datePickerButton}
-        onPress={() => setShowDataInicio(true)}
-      >
-        <Ionicons name="calendar-outline" size={20} color={COLORS.secondary} style={styles.inputIcon} />
-        <Text style={styles.datePickerText}>
-          {dataInicio ? `Todo dia ${dataInicio.getDate()} de cada mês` : 'Selecione o dia da recorrência'}
-        </Text>
-      </TouchableOpacity>
-
-      <View style={styles.dataFimContainer}>
-        <TouchableOpacity
-          style={styles.checkboxContainer}
-          onPress={() => setTemDataFim(!temDataFim)}
-        >
-          <View style={[styles.checkbox, temDataFim && styles.checkboxChecked]}>
-            {temDataFim && <Ionicons name="checkmark" size={16} color={COLORS.white} />}
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Tipo</Text>
+          <View style={styles.typeButtons}>
+            <TouchableOpacity
+              style={[
+                styles.typeButton,
+                tipo === 'despesa' && styles.typeButtonActive
+              ]}
+              onPress={() => setTipo('despesa')}
+            >
+              <Text style={[
+                styles.typeButtonText,
+                tipo === 'despesa' && styles.typeButtonTextActive
+              ]}>Despesa</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.typeButton,
+                tipo === 'receita' && styles.typeButtonActive
+              ]}
+              onPress={() => setTipo('receita')}
+            >
+              <Text style={[
+                styles.typeButtonText,
+                tipo === 'receita' && styles.typeButtonTextActive
+              ]}>Receita</Text>
+            </TouchableOpacity>
           </View>
-          <Text style={styles.checkboxLabel}>Definir data final</Text>
-        </TouchableOpacity>
+        </View>
 
-        {temDataFim && (
-          <TouchableOpacity 
-            style={[styles.datePickerButton, { marginTop: LAYOUT.spacing.xs }]}
-            onPress={() => setShowDataFim(true)}
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Valor</Text>
+          <TextInput
+            style={styles.input}
+            value={valor}
+            onChangeText={formatarValor}
+            keyboardType="numeric"
+            placeholder="0,00"
+            right={<TextInput.Affix text="R$" />}
+          />
+        </View>
+
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Descrição</Text>
+          <TextInput
+            style={styles.input}
+            value={descricao}
+            onChangeText={setDescricao}
+            placeholder="Descrição da recorrência"
+          />
+        </View>
+
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Categoria</Text>
+          <TextInput
+            style={styles.input}
+            value={categoria}
+            onChangeText={setCategoria}
+            placeholder="Categoria da recorrência"
+          />
+        </View>
+
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Fonte</Text>
+          <TextInput
+            style={styles.input}
+            value={fonte}
+            onChangeText={setFonte}
+            placeholder="Fonte da recorrência"
+          />
+        </View>
+
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Dia da Recorrência</Text>
+          <TextInput
+            style={styles.input}
+            value={diaRecorrencia.toString()}
+            onChangeText={(text) => {
+              const dia = parseInt(text);
+              if (!isNaN(dia) && dia >= 1 && dia <= 31) {
+                setDiaRecorrencia(dia);
+              }
+            }}
+            keyboardType="numeric"
+            placeholder="Dia do mês (1-31)"
+          />
+        </View>
+
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Data de Início</Text>
+          <TouchableOpacity
+            style={styles.dateButton}
+            onPress={() => setShowDataInicio(true)}
           >
-            <Ionicons name="calendar-outline" size={20} color={COLORS.secondary} style={styles.inputIcon} />
-            <Text style={styles.datePickerText}>
-              {dataFim ? formatarData(dataFim) : 'Selecione a data final'}
+            <Text style={styles.dateButtonText}>
+              {dataInicio ? formatarData(dataInicio) : 'Selecione a data'}
             </Text>
           </TouchableOpacity>
-        )}
+          {showDataInicio && (
+            <DateTimePicker
+              value={dataInicio || new Date()}
+              mode="date"
+              display="default"
+              onChange={handleDataInicioChange}
+              minimumDate={new Date()}
+            />
+          )}
+        </View>
+
+        <View style={styles.inputContainer}>
+          <TouchableOpacity
+            style={styles.checkboxContainer}
+            onPress={() => setTemDataFim(!temDataFim)}
+          >
+            <View style={[
+              styles.checkbox,
+              temDataFim && styles.checkboxChecked
+            ]}>
+              {temDataFim && (
+                <Ionicons name="checkmark" size={16} color={COLORS.white} />
+              )}
+            </View>
+            <Text style={styles.checkboxLabel}>Definir data final</Text>
+          </TouchableOpacity>
+
+          {temDataFim && (
+            <>
+              <TouchableOpacity
+                style={styles.dateButton}
+                onPress={() => setShowDataFim(true)}
+              >
+                <Text style={styles.dateButtonText}>
+                  {dataFim ? formatarData(dataFim) : 'Selecione a data'}
+                </Text>
+              </TouchableOpacity>
+              {showDataFim && (
+                <DateTimePicker
+                  value={dataFim || new Date()}
+                  mode="date"
+                  display="default"
+                  onChange={handleDataFimChange}
+                  minimumDate={dataInicio || new Date()}
+                />
+              )}
+            </>
+          )}
+        </View>
+
+        <TouchableOpacity
+          onPress={adicionarRecorrencia}
+          disabled={loading || !valor || !descricao || !dataInicio || (temDataFim && !dataFim)}
+          style={styles.addButton}
+        >
+          <LinearGradient
+            colors={[COLORS.secondary, COLORS.primary]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.gradientButton}
+          >
+            {loading ? (
+              <ActivityIndicator color={COLORS.white} size="small" />
+            ) : (
+              <Text style={styles.buttonText}>Adicionar recorrência mensal</Text>
+            )}
+          </LinearGradient>
+        </TouchableOpacity>
       </View>
 
-      {showDataInicio && (
-        <DateTimePicker
-          value={dataInicio || new Date()}
-          mode="date"
-          display="default"
-          onChange={handleDataInicioChange}
-          minimumDate={new Date()}
-        />
-      )}
-
-      {showDataFim && temDataFim && (
-        <DateTimePicker
-          value={dataFim || new Date()}
-          mode="date"
-          display="default"
-          onChange={handleDataFimChange}
-          minimumDate={dataInicio || undefined}
-        />
-      )}
-
-      <TouchableOpacity
-        onPress={adicionarRecorrencia}
-        disabled={loading || !valor || !descricao || !dataInicio || (temDataFim && !dataFim)}
-        style={styles.addButton}
-      >
-        <LinearGradient
-          colors={[COLORS.secondary, COLORS.primary]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={styles.gradientButton}
-        >
-          {loading ? (
-            <ActivityIndicator color={COLORS.white} size="small" />
-          ) : (
-            <Text style={styles.buttonText}>Adicionar recorrência mensal</Text>
-          )}
-        </LinearGradient>
-      </TouchableOpacity>
-
-      <Text style={styles.sectionTitle}>Recorrências cadastradas</Text>
-      
-      {recorrencias.map((item) => (
-        <View key={item.id} style={styles.itemContainer}>
-          <View style={styles.itemContent}>
+      <View style={styles.listContainer}>
+        <Text style={styles.sectionTitle}>Recorrências cadastradas</Text>
+        
+        {recorrencias.map((item) => (
+          <View key={item.id} style={styles.itemContainer}>
             <View style={styles.itemHeader}>
-              <View style={styles.itemTipo}>
-                <Ionicons
-                  name={item.tipo === 'despesa' ? 'arrow-down-outline' : 'arrow-up-outline'}
-                  size={20}
-                  color={item.tipo === 'despesa' ? COLORS.danger : COLORS.success}
-                />
-                <Text style={[
-                  styles.itemValor,
-                  { color: item.tipo === 'despesa' ? COLORS.danger : COLORS.success }
-                ]}>
-                  {formatCurrency(item.valor)}
-                </Text>
-              </View>
+              <Text style={styles.itemDescription}>{item.descricao}</Text>
               <TouchableOpacity
-                onPress={() => excluirRecorrencia(item.id)}
+                onPress={() => excluirRecorrencia(item.id!)}
                 disabled={loadingDelete === item.id}
-                style={styles.deleteButton}
               >
                 {loadingDelete === item.id ? (
                   <ActivityIndicator size="small" color={COLORS.danger} />
@@ -294,161 +336,143 @@ const RecurringEntryForm: React.FC = () => {
                 )}
               </TouchableOpacity>
             </View>
-            <Text style={styles.itemDescricao}>{item.descricao}</Text>
-            <Text style={styles.itemData}>
-              Todo dia {new Date(item.dataInicio).getDate()} de cada mês
-              {item.dataFim ? ` até ${formatarData(new Date(item.dataFim))}` : ' • Sem data final'}
-            </Text>
+            
+            <View style={styles.itemDetails}>
+              <Text style={[
+                styles.itemValue,
+                { color: item.tipo === 'receita' ? COLORS.success : COLORS.danger }
+              ]}>
+                {item.tipo === 'receita' ? '+' : '-'} R$ {item.valor.toFixed(2)}
+              </Text>
+              <Text style={styles.itemDate}>
+                Dia {item.diaRecorrencia} de cada mês
+              </Text>
+            </View>
           </View>
-        </View>
-      ))}
+        ))}
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  sectionTitle: {
-    fontSize: TYPO.size.md,
-    fontFamily: TYPO.family.semibold,
-    marginBottom: LAYOUT.spacing.md,
-    color: COLORS.text,
-  },
-  tipoContainer: {
-    flexDirection: 'row',
-    marginBottom: LAYOUT.spacing.md,
-    backgroundColor: COLORS.surface,
-    borderRadius: 12,
-    padding: 4,
-  },
-  tipoButton: {
+  container: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: LAYOUT.spacing.sm,
+    backgroundColor: COLORS.background,
+  },
+  formContainer: {
+    padding: LAYOUT.spacing.lg,
+  },
+  title: {
+    fontSize: TYPO.size.lg,
+    fontFamily: TYPO.family.bold,
+    color: COLORS.text,
+    marginBottom: LAYOUT.spacing.lg,
+  },
+  inputContainer: {
+    marginBottom: LAYOUT.spacing.md,
+  },
+  label: {
+    fontSize: TYPO.size.sm,
+    fontFamily: TYPO.family.medium,
+    color: COLORS.textSecondary,
+    marginBottom: LAYOUT.spacing.xs,
+  },
+  input: {
+    backgroundColor: COLORS.surface,
     borderRadius: 8,
-    marginHorizontal: 2,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
-  tipoButtonActive: {
-    backgroundColor: COLORS.secondary,
+  typeButtons: {
+    flexDirection: 'row',
+    gap: LAYOUT.spacing.sm,
   },
-  tipoText: {
-    marginLeft: 8,
+  typeButton: {
+    flex: 1,
+    padding: LAYOUT.spacing.sm,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    alignItems: 'center',
+  },
+  typeButtonActive: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  typeButtonText: {
     fontSize: TYPO.size.sm,
     fontFamily: TYPO.family.medium,
     color: COLORS.text,
   },
-  tipoTextActive: {
+  typeButtonTextActive: {
     color: COLORS.white,
   },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  dateButton: {
     backgroundColor: COLORS.surface,
-    borderRadius: 12,
-    marginBottom: LAYOUT.spacing.xs,
-    paddingHorizontal: LAYOUT.spacing.md,
+    padding: LAYOUT.spacing.sm,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: COLORS.border,
-    elevation: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 1,
-    height: 48,
   },
-  inputIcon: {
-    marginRight: LAYOUT.spacing.sm,
-  },
-  input: {
-    flex: 1,
-    backgroundColor: 'transparent',
-    height: 40,
-    paddingVertical: 0,
-  },
-  datePickerButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.surface,
-    borderRadius: 12,
-    marginBottom: LAYOUT.spacing.xs,
-    paddingHorizontal: LAYOUT.spacing.md,
-    paddingVertical: LAYOUT.spacing.sm,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    elevation: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 1,
-  },
-  datePickerText: {
-    flex: 1,
-    color: COLORS.text,
+  dateButtonText: {
     fontSize: TYPO.size.sm,
     fontFamily: TYPO.family.regular,
-  },
-  dataFimContainer: {
-    marginBottom: LAYOUT.spacing.md,
+    color: COLORS.text,
   },
   checkboxContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: LAYOUT.spacing.xs,
+    marginBottom: LAYOUT.spacing.sm,
   },
   checkbox: {
     width: 20,
     height: 20,
     borderRadius: 4,
-    borderWidth: 2,
-    borderColor: COLORS.secondary,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
     marginRight: LAYOUT.spacing.sm,
     alignItems: 'center',
     justifyContent: 'center',
   },
   checkboxChecked: {
-    backgroundColor: COLORS.secondary,
+    backgroundColor: COLORS.primary,
   },
   checkboxLabel: {
     fontSize: TYPO.size.sm,
-    fontFamily: TYPO.family.medium,
+    fontFamily: TYPO.family.regular,
     color: COLORS.text,
   },
   addButton: {
-    borderRadius: 12,
+    marginTop: LAYOUT.spacing.lg,
+    borderRadius: 8,
     overflow: 'hidden',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    marginTop: LAYOUT.spacing.sm,
-    marginBottom: LAYOUT.spacing.xl,
   },
   gradientButton: {
-    paddingVertical: LAYOUT.spacing.md,
+    padding: LAYOUT.spacing.md,
     alignItems: 'center',
-    justifyContent: 'center',
   },
   buttonText: {
     color: COLORS.white,
     fontSize: TYPO.size.md,
     fontFamily: TYPO.family.semibold,
   },
+  listContainer: {
+    padding: LAYOUT.spacing.lg,
+  },
+  sectionTitle: {
+    fontSize: TYPO.size.lg,
+    fontFamily: TYPO.family.bold,
+    color: COLORS.text,
+    marginBottom: LAYOUT.spacing.lg,
+  },
   itemContainer: {
     backgroundColor: COLORS.surface,
-    borderRadius: 12,
+    borderRadius: 8,
+    padding: LAYOUT.spacing.md,
     marginBottom: LAYOUT.spacing.sm,
     borderWidth: 1,
     borderColor: COLORS.border,
-    elevation: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 1,
-  },
-  itemContent: {
-    padding: LAYOUT.spacing.md,
   },
   itemHeader: {
     flexDirection: 'row',
@@ -456,28 +480,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: LAYOUT.spacing.xs,
   },
-  itemTipo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  itemValor: {
-    marginLeft: LAYOUT.spacing.xs,
+  itemDescription: {
     fontSize: TYPO.size.md,
-    fontFamily: TYPO.family.semibold,
-  },
-  itemDescricao: {
-    fontSize: TYPO.size.sm,
     fontFamily: TYPO.family.medium,
     color: COLORS.text,
-    marginBottom: 2,
   },
-  itemData: {
-    fontSize: TYPO.size.xs,
+  itemDetails: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  itemValue: {
+    fontSize: TYPO.size.sm,
+    fontFamily: TYPO.family.medium,
+  },
+  itemDate: {
+    fontSize: TYPO.size.sm,
     fontFamily: TYPO.family.regular,
     color: COLORS.textSecondary,
-  },
-  deleteButton: {
-    padding: 4,
   },
 });
 

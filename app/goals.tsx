@@ -14,7 +14,8 @@ import GoalCard from '../components/Goals/GoalCard';
 import AddGoalModal from '../components/Goals/AddGoalModal';
 
 // Serviços
-import { Goal, getGoals, saveGoal, updateGoal, deleteGoal } from '../services/dbService';
+import { Goal, getGoals, saveGoal, updateGoal, deleteGoal } from '../services/goalService';
+import { getTransactionsByPeriod } from '../services/transactionService';
 
 const { width } = Dimensions.get('window');
 

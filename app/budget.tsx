@@ -14,7 +14,8 @@ import BudgetCard from '../components/Budget/BudgetCard';
 import AddBudgetModal from '../components/Budget/AddBudgetModal';
 
 // Serviços
-import { Budget, getBudgets, saveBudget, updateBudget, deleteBudget, getExpensesByCategory } from '../services/dbService';
+import { Budget, getBudgets, saveBudget, updateBudget, deleteBudget } from '../services/budgetService';
+import { getTransactionsByCategory } from '../services/transactionService';
 
 const { width } = Dimensions.get('window');
 
@@ -51,7 +52,7 @@ const BudgetScreen = () => {
           const month = now.getMonth();
           
           // Buscar despesas da categoria no mês atual
-          const expenses = await getExpensesByCategory(userId, budget.category);
+          const expenses = await getTransactionsByCategory(userId, 'expense', budget.category);
           const categoryExpenses = expenses.filter(expense => {
             const expenseDate = new Date(expense.date);
             return expenseDate.getFullYear() === year && expenseDate.getMonth() === month;

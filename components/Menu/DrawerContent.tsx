@@ -37,6 +37,13 @@ const DrawerContent: React.FC<DrawerContentProps> = ({
       active: currentRoute === '/HomeScreen',
     },
     {
+      key: 'recorrencias',
+      label: 'Recorrências',
+      icon: 'repeat-outline',
+      route: '/recorrencias',
+      active: currentRoute === '/recorrencias',
+    },
+    {
       key: 'charts',
       label: 'Gráficos',
       icon: 'bar-chart-outline',

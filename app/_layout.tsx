@@ -152,7 +152,11 @@ export default function RootLayout() {
             headerStyle: { backgroundColor: COLORS.background },
             headerShadowVisible: false,
           }}
-        />
+        >
+          <Stack.Screen name="index" options={{ headerShown: false }} />
+          <Stack.Screen name="recorrencias" options={{ headerShown: false }} />
+          <Stack.Screen name="recorrencia-form" options={{ headerShown: false }} />
+        </Stack>
       </PaperProvider>
     </AuthProvider>
   );

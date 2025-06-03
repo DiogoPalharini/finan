@@ -16,12 +16,12 @@ import {
 } from 'react-native';
 import { TextInput, Text } from 'react-native-paper';
 import { useRouter } from 'expo-router';
-import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../config/firebaseConfig';
 import Title from '../src/components/Title';
 import { COLORS, TYPO, LAYOUT } from '../src/styles';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { login, signInWithGoogle, resetPassword, sendEmailVerification } from '../services/authService';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -31,14 +31,62 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [resetEmailSent, setResetEmailSent] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleLogin = async () => {
     setLoading(true);
+    setError(null);
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      await login(email, password);
+      router.push('/HomeScreen');
+    } catch (error: any) {
+      setError(error.message);
+      if (error.code === 'email-not-verified') {
+        // Mostrar botão para reenviar verificação
+        setResetEmailSent(true);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!email) {
+      alert('Por favor, insira seu email para recuperar a senha');
+      return;
+    }
+
+    try {
+      await resetPassword(email);
+      setResetEmailSent(true);
+      alert('Email de recuperação enviado com sucesso!');
+    } catch (error: any) {
+      alert(error.message);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    setLoading(true);
+    try {
+      await signInWithGoogle();
       router.push('/HomeScreen');
     } catch (error: any) {
       alert(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendVerification = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      await sendEmailVerification();
+      setResetEmailSent(true);
+      setError('Um novo email de verificação foi enviado. Por favor, verifique sua caixa de entrada.');
+    } catch (error: any) {
+      setError(error.message);
     } finally {
       setLoading(false);
     }
@@ -50,7 +98,7 @@ export default function LoginScreen() {
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <KeyboardAvoidingView
           style={styles.container}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}
         >
           <LinearGradient
@@ -126,6 +174,23 @@ export default function LoginScreen() {
                 }}
               />
             </View>
+            <TouchableOpacity onPress={handleResetPassword} style={styles.forgotPassword}>
+              <Text style={styles.forgotPasswordText}>Esqueceu sua senha?</Text>
+            </TouchableOpacity>
+            {error && (
+              <View style={styles.errorContainer}>
+                <Text style={styles.errorText}>{error}</Text>
+                {error.includes('não verificado') && !resetEmailSent && (
+                  <TouchableOpacity
+                    style={styles.resendButton}
+                    onPress={handleResendVerification}
+                    disabled={loading}
+                  >
+                    <Text style={styles.resendButtonText}>Reenviar Email de Verificação</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
             <TouchableOpacity
               onPress={handleLogin}
               disabled={loading}
@@ -145,13 +210,25 @@ export default function LoginScreen() {
                 )}
               </LinearGradient>
             </TouchableOpacity>
+            <View style={styles.divider}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>ou</Text>
+              <View style={styles.dividerLine} />
+            </View>
+            <TouchableOpacity
+              onPress={handleGoogleLogin}
+              disabled={loading}
+              style={styles.googleButton}
+            >
+              <Ionicons name="logo-google" size={24} color={COLORS.text} />
+              <Text style={styles.googleButtonText}>Entrar com Google</Text>
+            </TouchableOpacity>
             <TouchableOpacity
               onPress={() => router.push('/SignUpScreen')}
-              style={styles.linkContainer}
-              disabled={loading}
+              style={styles.signUpButton}
             >
-              <Text style={styles.linkText}>
-                Ainda não tem conta? <Text style={styles.linkHighlight}>Cadastre-se</Text>
+              <Text style={styles.signUpText}>
+                Não tem uma conta? <Text style={styles.signUpTextBold}>Cadastre-se</Text>
               </Text>
             </TouchableOpacity>
           </ScrollView>
@@ -167,15 +244,16 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
   },
   header: {
-    paddingTop: 60,
-    paddingBottom: 30,
+    paddingTop: StatusBar.currentHeight || 0,
+    paddingBottom: LAYOUT.spacing.xl,
     borderBottomLeftRadius: 30,
     borderBottomRightRadius: 30,
-    elevation: 4,
+    elevation: 5,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    backgroundColor: COLORS.primary,
     alignItems: 'center',
   },
   title: {
@@ -257,26 +335,85 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   gradientButton: {
-    paddingVertical: LAYOUT.spacing.md,
+    padding: LAYOUT.spacing.md,
+    borderRadius: 8,
     alignItems: 'center',
-    justifyContent: 'center',
   },
   buttonText: {
     color: COLORS.white,
     fontSize: TYPO.size.md,
     fontFamily: TYPO.family.semibold,
   },
-  linkContainer: {
-    marginTop: LAYOUT.spacing.lg,
+  forgotPassword: {
+    alignSelf: 'flex-end',
+    marginTop: 8,
+    marginBottom: 16,
+  },
+  forgotPasswordText: {
+    color: COLORS.primary,
+    fontSize: 14,
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 20,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: COLORS.border,
+  },
+  dividerText: {
+    marginHorizontal: 10,
+    color: COLORS.textSecondary,
+  },
+  googleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.surface,
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  googleButtonText: {
+    marginLeft: 10,
+    color: COLORS.text,
+    fontSize: 16,
+  },
+  signUpButton: {
+    marginTop: 16,
+  },
+  signUpText: {
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+  },
+  signUpTextBold: {
+    color: COLORS.primary,
+    fontWeight: 'bold',
+  },
+  errorContainer: {
+    marginTop: 10,
+    padding: 10,
+    backgroundColor: '#ffebee',
+    borderRadius: 5,
     alignItems: 'center',
   },
-  linkText: {
-    color: COLORS.textSecondary,
-    fontSize: TYPO.size.sm,
-    fontFamily: TYPO.family.regular,
+  errorText: {
+    color: '#c62828',
+    textAlign: 'center',
+    marginBottom: 10,
   },
-  linkHighlight: {
-    color: COLORS.secondary,
-    fontFamily: TYPO.family.medium,
+  resendButton: {
+    backgroundColor: COLORS.primary,
+    padding: 10,
+    borderRadius: 5,
+    marginTop: 5,
+  },
+  resendButtonText: {
+    color: '#fff',
+    textAlign: 'center',
   },
 });

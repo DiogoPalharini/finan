@@ -22,6 +22,7 @@ import { COLORS, TYPO, LAYOUT } from '../src/styles';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { login, signInWithGoogle, resetPassword, sendEmailVerification } from '../services/authService';
+import { ErrorMessage } from '../src/components/ErrorMessage';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -178,8 +179,11 @@ export default function LoginScreen() {
               <Text style={styles.forgotPasswordText}>Esqueceu sua senha?</Text>
             </TouchableOpacity>
             {error && (
-              <View style={styles.errorContainer}>
-                <Text style={styles.errorText}>{error}</Text>
+              <>
+                <ErrorMessage
+                  message={error}
+                  type={error.includes('não verificado') ? 'warning' : 'error'}
+                />
                 {error.includes('não verificado') && !resetEmailSent && (
                   <TouchableOpacity
                     style={styles.resendButton}
@@ -189,7 +193,7 @@ export default function LoginScreen() {
                     <Text style={styles.resendButtonText}>Reenviar Email de Verificação</Text>
                   </TouchableOpacity>
                 )}
-              </View>
+              </>
             )}
             <TouchableOpacity
               onPress={handleLogin}
@@ -393,18 +397,6 @@ const styles = StyleSheet.create({
   signUpTextBold: {
     color: COLORS.primary,
     fontWeight: 'bold',
-  },
-  errorContainer: {
-    marginTop: 10,
-    padding: 10,
-    backgroundColor: '#ffebee',
-    borderRadius: 5,
-    alignItems: 'center',
-  },
-  errorText: {
-    color: '#c62828',
-    textAlign: 'center',
-    marginBottom: 10,
   },
   resendButton: {
     backgroundColor: COLORS.primary,

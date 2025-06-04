@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Animated } from 'react-native';
+import { View, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Animated, Modal, TextInput, Platform, Alert } from 'react-native';
 import { Text, Button, Avatar, Divider, ActivityIndicator } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
+import { Linking } from 'react-native';
+import * as Notifications from 'expo-notifications';
 import { COLORS } from '../src/styles/colors';
 import { LAYOUT } from '../src/styles/layout';
 import { TYPO } from '../src/styles/typography';
 import { useAuth } from '../hooks/useAuth';
-import { getUserProfile, getProfileStats, UserProfile } from '../services/userService';
+import { getUserProfile, getProfileStats, UserProfile, saveUserProfile } from '../services/userService';
 import EditProfileModal from '../components/EditProfileModal';
 
 const { width } = Dimensions.get('window');
@@ -21,6 +23,11 @@ const ProfileScreen = () => {
   const [profileStats, setProfileStats] = useState({ goalCount: 0, savingsRate: 0, monthsActive: 0 });
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [editField, setEditField] = useState<{
+    field: string;
+    value: string;
+    label: string;
+  } | null>(null);
   
   // Animações
   const [animation] = useState({
@@ -106,7 +113,7 @@ const ProfileScreen = () => {
     setIsLoading(true);
     try {
       await logout();
-      router.replace('/login');
+      router.replace('/(auth)/login' as any);
     } catch (error) {
       console.error('Erro ao fazer logout:', error);
     } finally {
@@ -120,6 +127,110 @@ const ProfileScreen = () => {
 
   const handleProfileUpdated = () => {
     loadProfileData();
+  };
+
+  const handleEditField = (field: string, value: string, label: string) => {
+    setEditField({ field, value, label });
+  };
+
+  const handleSaveField = async (newValue: string) => {
+    if (!user || !editField) return;
+    
+    try {
+      setIsLoading(true);
+      const updates: Partial<UserProfile> = {
+        [editField.field]: newValue,
+        updatedAt: new Date().toISOString()
+      };
+      
+      await saveUserProfile(user.uid, updates);
+      await loadProfileData();
+      Alert.alert('Sucesso', 'Informação atualizada com sucesso!');
+    } catch (error) {
+      console.error('Erro ao atualizar campo:', error);
+      Alert.alert('Erro', 'Não foi possível atualizar a informação.');
+    } finally {
+      setIsLoading(false);
+      setEditField(null);
+    }
+  };
+
+  const handleNotificationToggle = async () => {
+    if (!user) return;
+
+    try {
+      setIsLoading(true);
+      
+      // Verificar permissões de notificação
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
+      
+      if (existingStatus !== 'granted') {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
+      
+      if (finalStatus !== 'granted') {
+        Alert.alert(
+          'Permissão necessária',
+          'Para receber notificações, você precisa permitir o acesso nas configurações do seu dispositivo.',
+          [
+            {
+              text: 'Cancelar',
+              style: 'cancel'
+            },
+            {
+              text: 'Abrir Configurações',
+              onPress: () => Linking.openSettings()
+            }
+          ]
+        );
+        return;
+      }
+
+      // Obter token do dispositivo
+      const token = (await Notifications.getExpoPushTokenAsync()).data;
+      
+      // Atualizar preferência de notificações no perfil
+      const updates: Partial<UserProfile> = {
+        notificationPreference: profileData?.notificationPreference === 'nenhuma' ? 'diaria' : 'nenhuma',
+        pushToken: token,
+        updatedAt: new Date().toISOString()
+      };
+      
+      await saveUserProfile(user.uid, updates);
+      await loadProfileData();
+      
+      // Configurar notificações locais se ativadas
+      if (updates.notificationPreference === 'diaria') {
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title: 'Finan - Resumo Diário',
+            body: 'Confira seu resumo financeiro do dia!',
+            data: { type: 'daily_summary' },
+          },
+          trigger: {
+            type: 'timeInterval',
+            seconds: 24 * 60 * 60, // 24 horas
+            repeats: true,
+          },
+        });
+      } else {
+        await Notifications.cancelAllScheduledNotificationsAsync();
+      }
+      
+      Alert.alert(
+        'Sucesso',
+        updates.notificationPreference === 'diaria' 
+          ? 'Notificações ativadas com sucesso!'
+          : 'Notificações desativadas com sucesso!'
+      );
+    } catch (error) {
+      console.error('Erro ao atualizar notificações:', error);
+      Alert.alert('Erro', 'Não foi possível atualizar as configurações de notificação.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Formatar valor de renda mensal
@@ -252,7 +363,7 @@ const ProfileScreen = () => {
       </Animated.View>
 
       {/* Seção de informações pessoais */}
-      <Animated.View 
+      <Animated.View
         style={[
           styles.section,
           {
@@ -270,6 +381,8 @@ const ProfileScreen = () => {
             icon="person-outline" 
             label="Nome" 
             value={profileData?.displayName || user.displayName || 'Não definido'} 
+            isEditable={true}
+            onEdit={() => handleEditField('displayName', profileData?.displayName || '', 'Nome')}
           />
           
           <Divider style={styles.itemDivider} />
@@ -303,6 +416,7 @@ const ProfileScreen = () => {
                 icon="card-outline" 
                 label="CPF" 
                 value={profileData.cpf} 
+                isSecure={true}
               />
             </>
           )}
@@ -310,7 +424,7 @@ const ProfileScreen = () => {
       </Animated.View>
 
       {/* Seção de informações financeiras */}
-      <Animated.View 
+      <Animated.View
         style={[
           styles.section,
           {
@@ -357,7 +471,7 @@ const ProfileScreen = () => {
       </Animated.View>
 
       {/* Seção de preferências */}
-      <Animated.View 
+      <Animated.View
         style={[
           styles.section,
           {
@@ -377,15 +491,7 @@ const ProfileScreen = () => {
             value={profileData?.notificationPreference === 'nenhuma' ? 'Desativadas' : 'Ativadas'} 
             showToggle={true}
             isEnabled={profileData?.notificationPreference !== 'nenhuma'}
-          />
-          
-          <Divider style={styles.itemDivider} />
-          
-          <ProfileInfoItem 
-            icon="moon-outline" 
-            label="Tema escuro" 
-            value="Desativado" 
-            showToggle={true}
+            onEdit={handleNotificationToggle}
           />
           
           <Divider style={styles.itemDivider} />
@@ -439,6 +545,45 @@ const ProfileScreen = () => {
         onSuccess={handleProfileUpdated}
         currentProfile={profileData}
       />
+
+      <Modal
+        visible={!!editField}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setEditField(null)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Editar {editField?.label}</Text>
+            
+            <TextInput
+              style={styles.modalInput}
+              value={editField?.value}
+              onChangeText={(text) => setEditField(prev => prev ? {...prev, value: text} : null)}
+              placeholder={`Digite seu ${editField?.label.toLowerCase()}`}
+            />
+            
+            <View style={styles.modalButtons}>
+              <Button
+                mode="outlined"
+                onPress={() => setEditField(null)}
+                style={styles.modalButton}
+              >
+                Cancelar
+              </Button>
+              
+              <Button
+                mode="contained"
+                onPress={() => handleSaveField(editField?.value || '')}
+                loading={isLoading}
+                style={styles.modalButton}
+              >
+                Salvar
+              </Button>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 };
@@ -449,6 +594,9 @@ interface ProfileInfoItemProps {
   value: string;
   showToggle?: boolean;
   isEnabled?: boolean;
+  isSecure?: boolean;
+  onEdit?: () => void;
+  isEditable?: boolean;
 }
 
 const ProfileInfoItem: React.FC<ProfileInfoItemProps> = ({ 
@@ -456,16 +604,34 @@ const ProfileInfoItem: React.FC<ProfileInfoItemProps> = ({
   label, 
   value,
   showToggle = false,
-  isEnabled: initialEnabled = false
+  isEnabled: initialEnabled = false,
+  isSecure = false,
+  onEdit,
+  isEditable = false
 }) => {
   const [isEnabled, setIsEnabled] = useState(initialEnabled || value === 'Ativadas' || value === 'Ativado');
+  const [showValue, setShowValue] = useState(!isSecure);
   
   useEffect(() => {
     setIsEnabled(initialEnabled || value === 'Ativadas' || value === 'Ativado');
   }, [initialEnabled, value]);
   
+  const handleToggleSecure = () => {
+    setShowValue(!showValue);
+  };
+
+  const handlePress = () => {
+    if (isEditable && onEdit) {
+      onEdit();
+    }
+  };
+  
   return (
-    <View style={styles.infoItem}>
+    <TouchableOpacity 
+      style={styles.infoItem}
+      onPress={handlePress}
+      disabled={!isEditable}
+    >
       <View style={styles.infoIconContainer}>
         <Ionicons name={icon as any} size={20} color={COLORS.secondary} />
       </View>
@@ -477,11 +643,22 @@ const ProfileInfoItem: React.FC<ProfileInfoItemProps> = ({
           numberOfLines={1}
           ellipsizeMode="tail"
         >
-          {value}
+          {isSecure && !showValue ? '••••••••••' : value}
         </Text>
       </View>
       
-      {showToggle ? (
+      {isSecure ? (
+        <TouchableOpacity 
+          style={styles.secureButton}
+          onPress={handleToggleSecure}
+        >
+          <Ionicons 
+            name={showValue ? "eye-off-outline" : "eye-outline"} 
+            size={20} 
+            color={COLORS.textSecondary} 
+          />
+        </TouchableOpacity>
+      ) : showToggle ? (
         <TouchableOpacity 
           style={[styles.toggleButton, isEnabled && styles.toggleButtonActive]}
           onPress={() => setIsEnabled(!isEnabled)}
@@ -489,9 +666,13 @@ const ProfileInfoItem: React.FC<ProfileInfoItemProps> = ({
           <View style={[styles.toggleCircle, isEnabled && styles.toggleCircleActive]} />
         </TouchableOpacity>
       ) : (
-        <Ionicons name="chevron-forward" size={18} color={COLORS.textSecondary} />
+        <Ionicons 
+          name={isEditable ? "pencil-outline" : "chevron-forward"} 
+          size={18} 
+          color={isEditable ? COLORS.secondary : COLORS.textSecondary} 
+        />
       )}
-    </View>
+    </TouchableOpacity>
   );
 };
 
@@ -725,6 +906,47 @@ const styles = StyleSheet.create({
     fontSize: TYPO.size.xs,
     fontFamily: TYPO.family.regular,
     color: COLORS.textSecondary,
+  },
+  secureButton: {
+    width: 44,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: COLORS.divider,
+    padding: 2,
+    justifyContent: 'center',
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 16,
+    padding: LAYOUT.spacing.lg,
+    width: '90%',
+    maxWidth: 400,
+  },
+  modalTitle: {
+    fontSize: TYPO.size.lg,
+    fontFamily: TYPO.family.bold,
+    color: COLORS.text,
+    marginBottom: LAYOUT.spacing.md,
+  },
+  modalInput: {
+    backgroundColor: COLORS.white,
+    borderRadius: 8,
+    padding: LAYOUT.spacing.sm,
+    marginBottom: LAYOUT.spacing.lg,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: LAYOUT.spacing.sm,
+  },
+  modalButton: {
+    minWidth: 100,
   },
 });
 

@@ -26,6 +26,10 @@ const TransactionItem: React.FC<TransactionItemProps> = ({
   incomeSources,
   expenseCategories
 }) => {
+  const categoryName = item.type === 'income'
+    ? incomeSources.find(s => s.id === item.source)?.name || 'Outros'
+    : expenseCategories.find(c => c.id === item.category)?.name || 'Outros';
+
   return (
     <TouchableOpacity
       onLongPress={() => onLongPress(item)}
@@ -42,15 +46,12 @@ const TransactionItem: React.FC<TransactionItemProps> = ({
       
       <View style={styles.transactionContent}>
         <Text style={styles.transactionDescription}>
-          {item.description}
+          {item.description || 'Sem descrição'}
         </Text>
         
         <View style={styles.transactionDetails}>
           <Text style={styles.transactionCategory}>
-            {item.type === 'income' 
-              ? incomeSources.find(s => s.id === item.source)?.name || item.source
-              : expenseCategories.find(c => c.id === item.category)?.name || item.category
-            }
+            {categoryName}
           </Text>
           
           <Text style={styles.transactionDate}>
@@ -64,7 +65,7 @@ const TransactionItem: React.FC<TransactionItemProps> = ({
           styles.transactionAmount,
           { color: item.type === 'income' ? COLORS.success : COLORS.danger }
         ]}>
-          {item.type === 'income' ? '+' : '-'} {formatCurrency(item.amount)}
+          {item.type === 'income' ? '+' : '-'} {formatCurrency(item.amount || 0)}
         </Text>
         
         <TouchableOpacity

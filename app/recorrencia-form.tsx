@@ -1,5 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, TouchableOpacity, ScrollView, TextInput, SafeAreaView, Alert } from 'react-native';
+import { 
+  View, 
+  StyleSheet, 
+  TouchableOpacity, 
+  ScrollView, 
+  TextInput, 
+  SafeAreaView, 
+  Alert,
+  Animated,
+  Dimensions
+} from 'react-native';
 import { Text, Button, RadioButton, Chip } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -13,23 +23,25 @@ import { TYPO } from '../src/styles/typography';
 import { useAuth } from '../hooks/useAuth';
 import { saveRecorrencia, getRecorrencia, updateRecorrencia, Recorrencia } from '../services/recurringService';
 
-// Categorias fixas
+const { width } = Dimensions.get('window');
+
+// Categorias com ícones
 const CATEGORIAS = {
   despesas: [
-    'Alimentação',
-    'Transporte',
-    'Moradia',
-    'Saúde',
-    'Educação',
-    'Lazer',
-    'Vestuário',
-    'Outros'
+    { nome: 'Alimentação', icon: 'restaurant-outline' },
+    { nome: 'Transporte', icon: 'car-outline' },
+    { nome: 'Moradia', icon: 'home-outline' },
+    { nome: 'Saúde', icon: 'medical-outline' },
+    { nome: 'Educação', icon: 'school-outline' },
+    { nome: 'Lazer', icon: 'game-controller-outline' },
+    { nome: 'Vestuário', icon: 'shirt-outline' },
+    { nome: 'Outros', icon: 'ellipsis-horizontal-outline' }
   ],
   receitas: [
-    'Salário',
-    'Freelance',
-    'Investimentos',
-    'Outros'
+    { nome: 'Salário', icon: 'briefcase-outline' },
+    { nome: 'Freelance', icon: 'laptop-outline' },
+    { nome: 'Investimentos', icon: 'trending-up-outline' },
+    { nome: 'Outros', icon: 'ellipsis-horizontal-outline' }
   ]
 };
 
@@ -47,8 +59,26 @@ const RecurringFormScreen = () => {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [datePickerMode, setDatePickerMode] = useState<'inicio' | 'fim'>('inicio');
   const [temDataFim, setTemDataFim] = useState(false);
+  
+  // Animações
+  const fadeAnim = new Animated.Value(0);
+  const slideAnim = new Animated.Value(30);
 
   useEffect(() => {
+    // Animação de entrada
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 600,
+        useNativeDriver: true,
+      })
+    ]).start();
+
     if (id) {
       loadRecorrencia();
     }
@@ -57,7 +87,7 @@ const RecurringFormScreen = () => {
   const loadRecorrencia = async () => {
     try {
       setLoading(true);
-      const recorrencia = await getRecorrencia(id);
+      const recorrencia = await getRecorrencia(user!.uid, id);
       if (recorrencia) {
         setTipo(recorrencia.tipo);
         setValor(recorrencia.valor.toString());
@@ -88,8 +118,27 @@ const RecurringFormScreen = () => {
   };
 
   const formatarData = (date: Date | null): string => {
-    if (!date) return 'Sem data final';
+    if (!date) return 'Selecionar data';
     return format(date, "dd 'de' MMMM 'de' yyyy", { locale: ptBR });
+  };
+
+  const formatarValor = (text: string) => {
+    // Remove tudo que não é número
+    const numeros = text.replace(/[^0-9]/g, '');
+    
+    // Converte para formato monetário
+    if (numeros.length === 0) return '';
+    
+    const valor = parseInt(numeros) / 100;
+    return valor.toLocaleString('pt-BR', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+  };
+
+  const handleValorChange = (text: string) => {
+    const valorFormatado = formatarValor(text);
+    setValor(valorFormatado);
   };
 
   const handleSubmit = async () => {
@@ -103,7 +152,7 @@ const RecurringFormScreen = () => {
     try {
       setLoading(true);
 
-      const valorNumerico = parseFloat(valor.replace(',', '.'));
+      const valorNumerico = parseFloat(valor.replace(/\./g, '').replace(',', '.'));
       if (isNaN(valorNumerico)) {
         throw new Error('Valor inválido');
       }
@@ -115,7 +164,7 @@ const RecurringFormScreen = () => {
         categoria,
         diaRecorrencia,
         dataInicio: dataInicio.toISOString(),
-        dataFim: temDataFim ? dataFim?.toISOString() : null
+        dataFim: temDataFim && dataFim ? dataFim.toISOString() : undefined
       };
 
       if (id) {
@@ -133,186 +182,339 @@ const RecurringFormScreen = () => {
     }
   };
 
+  const renderTipoCard = () => (
+    <View style={styles.card}>
+      <View style={styles.cardHeader}>
+        <Ionicons name="swap-horizontal-outline" size={20} color={COLORS.primary} />
+        <Text style={styles.cardTitle}>Tipo de Transação</Text>
+      </View>
+      
+      <View style={styles.tipoContainer}>
+        <TouchableOpacity
+          style={[
+            styles.tipoOption,
+            tipo === 'despesa' && styles.tipoOptionSelected,
+            { borderColor: COLORS.danger + '30' }
+          ]}
+          onPress={() => setTipo('despesa')}
+        >
+          <LinearGradient
+            colors={tipo === 'despesa' ? [COLORS.danger, COLORS.danger + 'CC'] : ['transparent', 'transparent']}
+            style={styles.tipoOptionGradient}
+          >
+            <Ionicons 
+              name="trending-down" 
+              size={24} 
+              color={tipo === 'despesa' ? COLORS.white : COLORS.danger} 
+            />
+            <Text style={[
+              styles.tipoOptionText,
+              { color: tipo === 'despesa' ? COLORS.white : COLORS.danger }
+            ]}>
+              Despesa
+            </Text>
+          </LinearGradient>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.tipoOption,
+            tipo === 'receita' && styles.tipoOptionSelected,
+            { borderColor: COLORS.success + '30' }
+          ]}
+          onPress={() => setTipo('receita')}
+        >
+          <LinearGradient
+            colors={tipo === 'receita' ? [COLORS.success, COLORS.success + 'CC'] : ['transparent', 'transparent']}
+            style={styles.tipoOptionGradient}
+          >
+            <Ionicons 
+              name="trending-up" 
+              size={24} 
+              color={tipo === 'receita' ? COLORS.white : COLORS.success} 
+            />
+            <Text style={[
+              styles.tipoOptionText,
+              { color: tipo === 'receita' ? COLORS.white : COLORS.success }
+            ]}>
+              Receita
+            </Text>
+          </LinearGradient>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
+  const renderValorCard = () => (
+    <View style={styles.card}>
+      <View style={styles.cardHeader}>
+        <Ionicons name="cash-outline" size={20} color={COLORS.primary} />
+        <Text style={styles.cardTitle}>Valor</Text>
+      </View>
+      
+      <View style={styles.valorContainer}>
+        <Text style={styles.valorPrefix}>R$</Text>
+        <TextInput
+          style={styles.valorInput}
+          value={valor}
+          onChangeText={handleValorChange}
+          keyboardType="numeric"
+          placeholder="0,00"
+          placeholderTextColor={COLORS.textSecondary}
+        />
+      </View>
+    </View>
+  );
+
+  const renderDescricaoCard = () => (
+    <View style={styles.card}>
+      <View style={styles.cardHeader}>
+        <Ionicons name="document-text-outline" size={20} color={COLORS.primary} />
+        <Text style={styles.cardTitle}>Descrição</Text>
+      </View>
+      
+      <TextInput
+        style={styles.descricaoInput}
+        value={descricao}
+        onChangeText={setDescricao}
+        placeholder="Ex: Aluguel do apartamento"
+        placeholderTextColor={COLORS.textSecondary}
+        multiline
+        numberOfLines={2}
+      />
+    </View>
+  );
+
+  const renderCategoriaCard = () => (
+    <View style={styles.card}>
+      <View style={styles.cardHeader}>
+        <Ionicons name="folder-outline" size={20} color={COLORS.primary} />
+        <Text style={styles.cardTitle}>Categoria</Text>
+      </View>
+      
+      <View style={styles.categoriaContainer}>
+        {CATEGORIAS[tipo === 'despesa' ? 'despesas' : 'receitas'].map((cat) => (
+          <TouchableOpacity
+            key={cat.nome}
+            style={[
+              styles.categoriaItem,
+              categoria === cat.nome && styles.categoriaItemSelected
+            ]}
+            onPress={() => setCategoria(cat.nome)}
+          >
+            <Ionicons 
+              name={cat.icon as any} 
+              size={16} 
+              color={categoria === cat.nome ? COLORS.white : COLORS.textSecondary} 
+            />
+            <Text style={[
+              styles.categoriaItemText,
+              categoria === cat.nome && styles.categoriaItemTextSelected
+            ]}>
+              {cat.nome}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    </View>
+  );
+
+  const renderDiaCard = () => (
+    <View style={styles.card}>
+      <View style={styles.cardHeader}>
+        <Ionicons name="calendar-outline" size={20} color={COLORS.primary} />
+        <Text style={styles.cardTitle}>Dia da Recorrência</Text>
+      </View>
+      
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        <View style={styles.diaContainer}>
+          {Array.from({ length: 31 }, (_, i) => i + 1).map((dia) => (
+            <TouchableOpacity
+              key={dia}
+              style={[
+                styles.diaItem,
+                diaRecorrencia === dia && styles.diaItemSelected
+              ]}
+              onPress={() => setDiaRecorrencia(dia)}
+            >
+              <Text style={[
+                styles.diaItemText,
+                diaRecorrencia === dia && styles.diaItemTextSelected
+              ]}>
+                {dia}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </ScrollView>
+    </View>
+  );
+
+  const renderDataCard = () => (
+    <View style={styles.card}>
+      <View style={styles.cardHeader}>
+        <Ionicons name="time-outline" size={20} color={COLORS.primary} />
+        <Text style={styles.cardTitle}>Período</Text>
+      </View>
+      
+      {/* Data de início */}
+      <View style={styles.dataItem}>
+        <Text style={styles.dataLabel}>Data de início</Text>
+        <TouchableOpacity
+          style={styles.dataButton}
+          onPress={() => {
+            setDatePickerMode('inicio');
+            setShowDatePicker(true);
+          }}
+        >
+          <Ionicons name="calendar" size={16} color={COLORS.primary} />
+          <Text style={styles.dataButtonText}>
+            {format(dataInicio, "dd/MM/yyyy")}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Toggle data fim */}
+      <View style={styles.dataFimToggle}>
+        <Text style={styles.dataLabel}>Tem data final?</Text>
+        <TouchableOpacity
+          style={[
+            styles.toggleButton,
+            temDataFim && styles.toggleButtonActive
+          ]}
+          onPress={() => setTemDataFim(!temDataFim)}
+        >
+          <Text style={[
+            styles.toggleButtonText,
+            temDataFim && styles.toggleButtonTextActive
+          ]}>
+            {temDataFim ? 'Sim' : 'Não'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Data de fim */}
+      {temDataFim && (
+        <View style={styles.dataItem}>
+          <Text style={styles.dataLabel}>Data final</Text>
+          <TouchableOpacity
+            style={styles.dataButton}
+            onPress={() => {
+              setDatePickerMode('fim');
+              setShowDatePicker(true);
+            }}
+          >
+            <Ionicons name="calendar" size={16} color={COLORS.primary} />
+            <Text style={styles.dataButtonText}>
+              {dataFim ? format(dataFim, "dd/MM/yyyy") : 'Selecionar'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    </View>
+  );
+
   return (
     <SafeAreaView style={styles.container}>
-      <Stack.Screen options={{ 
-        title: id ? 'Editar Recorrência' : 'Nova Recorrência',
-        headerShown: false
-      }} />
+      <Stack.Screen options={{ headerShown: false }} />
+      
+      {/* Header */}
       <LinearGradient
         colors={[COLORS.secondary, COLORS.primary]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.header}
       >
-        <TouchableOpacity onPress={() => router.back()}>
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={() => router.back()}
+        >
           <Ionicons name="arrow-back" size={24} color={COLORS.white} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>
-          {id ? 'Editar Recorrência' : 'Nova Recorrência'}
-        </Text>
-        <View style={{ width: 24 }} />
+        
+        <View style={styles.headerContent}>
+          <Text style={styles.headerTitle}>
+            {id ? 'Editar Recorrência' : 'Nova Recorrência'}
+          </Text>
+          <Text style={styles.headerSubtitle}>
+            {id ? 'Modifique os dados abaixo' : 'Preencha os dados abaixo'}
+          </Text>
+        </View>
+        
+        <View style={styles.headerIcon}>
+          <Ionicons name="repeat" size={24} color={COLORS.white} />
+        </View>
       </LinearGradient>
 
-      <ScrollView style={styles.content}>
-        <View style={styles.formGroup}>
-          <Text style={styles.label}>Tipo</Text>
-          <RadioButton.Group onValueChange={value => setTipo(value as 'despesa' | 'receita')} value={tipo}>
-            <View style={styles.radioGroup}>
-              <RadioButton.Item 
-                label="Despesa" 
-                value="despesa" 
-                color={COLORS.danger}
-                labelStyle={styles.radioLabel}
-              />
-              <RadioButton.Item 
-                label="Receita" 
-                value="receita" 
-                color={COLORS.success}
-                labelStyle={styles.radioLabel}
-              />
-            </View>
-          </RadioButton.Group>
-        </View>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollViewContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <Animated.View
+          style={[
+            styles.content,
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }]
+            }
+          ]}
+        >
+          {renderTipoCard()}
+          {renderValorCard()}
+          {renderDescricaoCard()}
+          {renderCategoriaCard()}
+          {renderDiaCard()}
+          {renderDataCard()}
 
-        <View style={styles.formGroup}>
-          <Text style={styles.label}>Valor</Text>
-          <TextInput
-            style={styles.input}
-            value={valor}
-            onChangeText={setValor}
-            keyboardType="numeric"
-            placeholder="0,00"
-            placeholderTextColor={COLORS.textSecondary}
-          />
-        </View>
-
-        <View style={styles.formGroup}>
-          <Text style={styles.label}>Descrição</Text>
-          <TextInput
-            style={styles.input}
-            value={descricao}
-            onChangeText={setDescricao}
-            placeholder="Descrição da recorrência"
-            placeholderTextColor={COLORS.textSecondary}
-          />
-        </View>
-
-        <View style={styles.formGroup}>
-          <Text style={styles.label}>Categoria</Text>
-          <View style={styles.pickerContainer}>
-            {CATEGORIAS[tipo === 'despesa' ? 'despesas' : 'receitas'].map((cat) => (
-              <TouchableOpacity
-                key={cat}
-                style={[
-                  styles.pickerItem,
-                  categoria === cat && styles.pickerItemSelected
-                ]}
-                onPress={() => setCategoria(cat)}
-              >
-                <Text style={[
-                  styles.pickerItemText,
-                  categoria === cat && styles.pickerItemTextSelected
-                ]}>{cat}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
-        <View style={styles.formGroup}>
-          <Text style={styles.label}>Dia da Recorrência</Text>
-          <View style={styles.diaPickerContainer}>
-            {Array.from({ length: 31 }, (_, i) => i + 1).map((dia) => (
-              <TouchableOpacity
-                key={dia}
-                style={[
-                  styles.diaPickerItem,
-                  diaRecorrencia === dia && styles.diaPickerItemSelected
-                ]}
-                onPress={() => setDiaRecorrencia(dia)}
-              >
-                <Text style={[
-                  styles.diaPickerItemText,
-                  diaRecorrencia === dia && styles.diaPickerItemTextSelected
-                ]}>{dia}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
-        <View style={styles.formGroup}>
-          <Text style={styles.label}>Data de Início</Text>
-          <TouchableOpacity
-            style={styles.dateButton}
-            onPress={() => {
-              setDatePickerMode('inicio');
-              setShowDatePicker(true);
-            }}
-          >
-            <Text style={styles.dateButtonText}>
-              {format(dataInicio, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.formGroup}>
-          <View style={styles.dataFimHeader}>
-            <Text style={styles.label}>Data Final (opcional)</Text>
-            <Chip
-              selected={temDataFim}
-              onPress={() => setTemDataFim(!temDataFim)}
-              style={styles.toggleChip}
-              textStyle={styles.toggleChipText}
-            >
-              {temDataFim ? 'Definida' : 'Indefinida'}
-            </Chip>
-          </View>
-          
-          {temDataFim && (
+          {/* Botões de ação */}
+          <View style={styles.actionsContainer}>
             <TouchableOpacity
-              style={styles.dateButton}
-              onPress={() => {
-                setDatePickerMode('fim');
-                setShowDatePicker(true);
-              }}
+              style={styles.cancelButton}
+              onPress={() => router.back()}
             >
-              <Text style={styles.dateButtonText}>
-                {formatarData(dataFim)}
-              </Text>
+              <Text style={styles.cancelButtonText}>Cancelar</Text>
             </TouchableOpacity>
-          )}
-        </View>
+            
+            <TouchableOpacity
+              style={styles.saveButton}
+              onPress={handleSubmit}
+              disabled={loading}
+            >
+              <LinearGradient
+                colors={[COLORS.primary, COLORS.secondary]}
+                style={styles.saveButtonGradient}
+              >
+                {loading ? (
+                  <Animated.View style={styles.loadingContainer}>
+                    <Text style={styles.saveButtonText}>Salvando...</Text>
+                  </Animated.View>
+                ) : (
+                  <>
+                    <Ionicons name="checkmark" size={20} color={COLORS.white} />
+                    <Text style={styles.saveButtonText}>
+                      {id ? 'Salvar' : 'Criar'}
+                    </Text>
+                  </>
+                )}
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
 
-        {showDatePicker && (
-          <DateTimePicker
-            value={datePickerMode === 'inicio' ? dataInicio : (dataFim || new Date())}
-            mode="date"
-            display="default"
-            onChange={handleDateChange}
-            minimumDate={datePickerMode === 'fim' ? dataInicio : undefined}
-          />
-        )}
-
-        <View style={styles.formActions}>
-          <Button
-            mode="outlined"
-            onPress={() => router.back()}
-            style={styles.formButton}
-            textColor={COLORS.text}
-          >
-            Cancelar
-          </Button>
-          <Button
-            mode="contained"
-            onPress={handleSubmit}
-            style={styles.formButton}
-            loading={loading}
-            buttonColor={COLORS.primary}
-          >
-            {id ? 'Salvar' : 'Adicionar'}
-          </Button>
-        </View>
+          <View style={{ height: 50 }} />
+        </Animated.View>
       </ScrollView>
+
+      {/* Date Picker */}
+      {showDatePicker && (
+        <DateTimePicker
+          value={datePickerMode === 'inicio' ? dataInicio : (dataFim || new Date())}
+          mode="date"
+          display="default"
+          onChange={handleDateChange}
+          minimumDate={datePickerMode === 'fim' ? dataInicio : undefined}
+        />
+      )}
     </SafeAreaView>
   );
 };
@@ -327,136 +529,275 @@ const styles = StyleSheet.create({
     paddingBottom: LAYOUT.spacing.lg,
     paddingHorizontal: LAYOUT.spacing.lg,
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: LAYOUT.spacing.md,
+  },
+  headerContent: {
+    flex: 1,
   },
   headerTitle: {
     fontSize: TYPO.size.xl,
     fontFamily: TYPO.family.bold,
     color: COLORS.white,
+    marginBottom: 4,
+  },
+  headerSubtitle: {
+    fontSize: TYPO.size.sm,
+    fontFamily: TYPO.family.regular,
+    color: COLORS.white + 'CC',
+  },
+  headerIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollViewContent: {
+    flexGrow: 1,
   },
   content: {
-    flex: 1,
     padding: LAYOUT.spacing.lg,
   },
-  formGroup: {
-    marginBottom: LAYOUT.spacing.lg,
-  },
-  label: {
-    fontSize: TYPO.size.md,
-    fontFamily: TYPO.family.medium,
-    color: COLORS.text,
-    marginBottom: LAYOUT.spacing.xs,
-  },
-  input: {
+  card: {
     backgroundColor: COLORS.surface,
-    borderRadius: 8,
-    padding: LAYOUT.spacing.sm,
+    borderRadius: 20,
+    padding: LAYOUT.spacing.lg,
+    marginBottom: LAYOUT.spacing.md,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: LAYOUT.spacing.md,
+  },
+  cardTitle: {
+    fontSize: TYPO.size.md,
+    fontFamily: TYPO.family.semibold,
+    color: COLORS.text,
+    marginLeft: LAYOUT.spacing.sm,
+  },
+  tipoContainer: {
+    flexDirection: 'row',
+    gap: LAYOUT.spacing.sm,
+  },
+  tipoOption: {
+    flex: 1,
+    borderRadius: 16,
+    borderWidth: 2,
+    overflow: 'hidden',
+  },
+  tipoOptionSelected: {
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+  },
+  tipoOptionGradient: {
+    padding: LAYOUT.spacing.md,
+    alignItems: 'center',
+  },
+  tipoOptionText: {
+    fontSize: TYPO.size.sm,
+    fontFamily: TYPO.family.semibold,
+    marginTop: 4,
+  },
+  valorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.background,
+    borderRadius: 12,
+    paddingHorizontal: LAYOUT.spacing.md,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  valorPrefix: {
+    fontSize: TYPO.size.lg,
+    fontFamily: TYPO.family.bold,
+    color: COLORS.primary,
+    marginRight: LAYOUT.spacing.sm,
+  },
+  valorInput: {
+    flex: 1,
+    fontSize: TYPO.size.lg,
+    fontFamily: TYPO.family.bold,
+    color: COLORS.text,
+    paddingVertical: LAYOUT.spacing.sm,
+  },
+  descricaoInput: {
+    backgroundColor: COLORS.background,
+    borderRadius: 12,
+    padding: LAYOUT.spacing.md,
     borderWidth: 1,
     borderColor: COLORS.border,
     fontSize: TYPO.size.md,
     fontFamily: TYPO.family.regular,
     color: COLORS.text,
+    textAlignVertical: 'top',
   },
-  radioGroup: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    backgroundColor: COLORS.surface,
-    borderRadius: 8,
-    padding: LAYOUT.spacing.xs,
-  },
-  radioLabel: {
-    fontSize: TYPO.size.md,
-    fontFamily: TYPO.family.medium,
-  },
-  pickerContainer: {
+  categoriaContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: LAYOUT.spacing.xs,
+    gap: LAYOUT.spacing.sm,
   },
-  pickerItem: {
+  categoriaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: LAYOUT.spacing.sm,
     paddingVertical: LAYOUT.spacing.xs,
     borderRadius: 16,
-    backgroundColor: COLORS.surface,
+    backgroundColor: COLORS.background,
     borderWidth: 1,
     borderColor: COLORS.border,
   },
-  pickerItemSelected: {
+  categoriaItemSelected: {
     backgroundColor: COLORS.primary,
     borderColor: COLORS.primary,
   },
-  pickerItemText: {
+  categoriaItemText: {
     fontSize: TYPO.size.sm,
     fontFamily: TYPO.family.regular,
     color: COLORS.text,
+    marginLeft: 6,
   },
-  pickerItemTextSelected: {
+  categoriaItemTextSelected: {
     color: COLORS.white,
   },
-  diaPickerContainer: {
+  diaContainer: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: LAYOUT.spacing.xs,
+    paddingHorizontal: LAYOUT.spacing.xs,
   },
-  diaPickerItem: {
+  diaItem: {
     width: 40,
     height: 40,
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: 20,
-    backgroundColor: COLORS.surface,
+    backgroundColor: COLORS.background,
     borderWidth: 1,
     borderColor: COLORS.border,
   },
-  diaPickerItemSelected: {
+  diaItemSelected: {
     backgroundColor: COLORS.primary,
     borderColor: COLORS.primary,
   },
-  diaPickerItemText: {
+  diaItemText: {
     fontSize: TYPO.size.sm,
-    fontFamily: TYPO.family.regular,
-    color: COLORS.text,
-  },
-  diaPickerItemTextSelected: {
-    color: COLORS.white,
-  },
-  dateButton: {
-    backgroundColor: COLORS.surface,
-    borderRadius: 8,
-    padding: LAYOUT.spacing.sm,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  dateButtonText: {
-    fontSize: TYPO.size.sm,
-    fontFamily: TYPO.family.regular,
-    color: COLORS.text,
-  },
-  dataFimHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: LAYOUT.spacing.xs,
-  },
-  toggleChip: {
-    backgroundColor: COLORS.surface,
-  },
-  toggleChipText: {
-    fontSize: TYPO.size.xs,
     fontFamily: TYPO.family.medium,
     color: COLORS.text,
   },
-  formActions: {
+  diaItemTextSelected: {
+    color: COLORS.white,
+  },
+  dataItem: {
+    marginBottom: LAYOUT.spacing.md,
+  },
+  dataLabel: {
+    fontSize: TYPO.size.sm,
+    fontFamily: TYPO.family.medium,
+    color: COLORS.textSecondary,
+    marginBottom: LAYOUT.spacing.xs,
+  },
+  dataButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.background,
+    borderRadius: 12,
+    padding: LAYOUT.spacing.md,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  dataButtonText: {
+    fontSize: TYPO.size.md,
+    fontFamily: TYPO.family.regular,
+    color: COLORS.text,
+    marginLeft: LAYOUT.spacing.sm,
+  },
+  dataFimToggle: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: LAYOUT.spacing.lg,
-    marginBottom: LAYOUT.spacing.xl,
+    alignItems: 'center',
+    marginBottom: LAYOUT.spacing.md,
   },
-  formButton: {
+  toggleButton: {
+    paddingHorizontal: LAYOUT.spacing.md,
+    paddingVertical: LAYOUT.spacing.xs,
+    borderRadius: 16,
+    backgroundColor: COLORS.background,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  toggleButtonActive: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  toggleButtonText: {
+    fontSize: TYPO.size.sm,
+    fontFamily: TYPO.family.medium,
+    color: COLORS.text,
+  },
+  toggleButtonTextActive: {
+    color: COLORS.white,
+  },
+  actionsContainer: {
+    flexDirection: 'row',
+    gap: LAYOUT.spacing.md,
+    marginTop: LAYOUT.spacing.lg,
+  },
+  cancelButton: {
     flex: 1,
-    marginHorizontal: LAYOUT.spacing.xs,
+    paddingVertical: LAYOUT.spacing.md,
+    borderRadius: 16,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    alignItems: 'center',
+  },
+  cancelButtonText: {
+    fontSize: TYPO.size.md,
+    fontFamily: TYPO.family.semibold,
+    color: COLORS.textSecondary,
+  },
+  saveButton: {
+    flex: 1,
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  saveButtonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: LAYOUT.spacing.md,
+  },
+  saveButtonText: {
+    fontSize: TYPO.size.md,
+    fontFamily: TYPO.family.semibold,
+    color: COLORS.white,
+    marginLeft: 8,
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
 });
 
-export default RecurringFormScreen; 
+export default RecurringFormScreen;
+

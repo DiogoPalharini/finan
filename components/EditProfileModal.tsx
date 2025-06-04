@@ -7,7 +7,8 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
-  Dimensions
+  Dimensions,
+  Alert
 } from 'react-native';
 import { Text, TextInput, Button, ActivityIndicator, HelperText } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
@@ -73,102 +74,99 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
     onClose();
   };
   
-  // Formatar telefone
-  const formatPhone = (text: string) => {
-    const cleaned = text.replace(/\D/g, '');
-    let formatted = cleaned;
-    
-    if (cleaned.length > 0) {
-      if (cleaned.length <= 2) {
-        formatted = `(${cleaned}`;
-      } else if (cleaned.length <= 6) {
-        formatted = `(${cleaned.slice(0, 2)}) ${cleaned.slice(2)}`;
-      } else if (cleaned.length <= 10) {
-        formatted = `(${cleaned.slice(0, 2)}) ${cleaned.slice(2, 6)}-${cleaned.slice(6)}`;
-      } else {
-        formatted = `(${cleaned.slice(0, 2)}) ${cleaned.slice(2, 7)}-${cleaned.slice(7, 11)}`;
-      }
-    }
-    
-    return formatted;
-  };
-
-  // Formatar data de nascimento
-  const formatBirthDate = (text: string) => {
-    const cleaned = text.replace(/\D/g, '');
-    let formatted = cleaned;
-    
-    if (cleaned.length > 0) {
-      if (cleaned.length <= 2) {
-        formatted = cleaned;
-      } else if (cleaned.length <= 4) {
-        formatted = `${cleaned.slice(0, 2)}/${cleaned.slice(2)}`;
-      } else {
-        formatted = `${cleaned.slice(0, 2)}/${cleaned.slice(2, 4)}/${cleaned.slice(4, 8)}`;
-      }
-    }
-    
-    return formatted;
-  };
-
-  // Formatar CPF
-  const formatCPF = (text: string) => {
-    const cleaned = text.replace(/\D/g, '');
-    let formatted = cleaned;
-    
-    if (cleaned.length > 0) {
-      if (cleaned.length <= 3) {
-        formatted = cleaned;
-      } else if (cleaned.length <= 6) {
-        formatted = `${cleaned.slice(0, 3)}.${cleaned.slice(3)}`;
-      } else if (cleaned.length <= 9) {
-        formatted = `${cleaned.slice(0, 3)}.${cleaned.slice(3, 6)}.${cleaned.slice(6)}`;
-      } else {
-        formatted = `${cleaned.slice(0, 3)}.${cleaned.slice(3, 6)}.${cleaned.slice(6, 9)}-${cleaned.slice(9, 11)}`;
-      }
-    }
-    
-    return formatted;
-  };
-  
-  // Validar campos
+  // Validar campos do formulário
   const validateFields = () => {
     const newErrors: Record<string, string> = {};
     
     if (currentStep === 0) {
-      if (!name.trim()) newErrors.name = 'Nome é obrigatório';
-      if (!phone.trim()) newErrors.phone = 'Telefone é obrigatório';
-      if (!birthDate.trim()) newErrors.birthDate = 'Data de nascimento é obrigatória';
-    } else if (currentStep === 1) {
-      if (!profession.trim()) newErrors.profession = 'Profissão é obrigatória';
-      if (!monthlyIncome) newErrors.monthlyIncome = 'Renda mensal é obrigatória';
-      if (!financialGoal) newErrors.financialGoal = 'Objetivo financeiro é obrigatório';
-    } else if (currentStep === 2) {
-      if (!password) newErrors.password = 'Senha é obrigatória para confirmar alterações';
+      if (!name.trim()) {
+        newErrors.name = 'Nome é obrigatório';
+      }
+      
+      if (phone && !/^\(\d{2}\) \d{5}-\d{4}$/.test(phone)) {
+        newErrors.phone = 'Telefone inválido';
+      }
+      
+      if (birthDate && !/^\d{2}\/\d{2}\/\d{4}$/.test(birthDate)) {
+        newErrors.birthDate = 'Data inválida';
+      }
+    }
+    
+    if (currentStep === 1) {
+      if (!profession.trim()) {
+        newErrors.profession = 'Profissão é obrigatória';
+      }
+      
+      if (!employmentStatus) {
+        newErrors.employmentStatus = 'Situação de emprego é obrigatória';
+      }
+      
+      if (!monthlyIncome) {
+        newErrors.monthlyIncome = 'Renda mensal é obrigatória';
+      }
+    }
+    
+    if (currentStep === 2) {
+      if (!password) {
+        newErrors.password = 'Senha é obrigatória';
+      }
     }
     
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
   
-  // Avançar para a próxima etapa
-  const handleNext = () => {
+  // Formatar telefone
+  const formatPhone = (text: string) => {
+    const cleaned = text.replace(/\D/g, '');
+    const match = cleaned.match(/^(\d{2})(\d{5})(\d{4})$/);
+    
+    if (match) {
+      return `(${match[1]}) ${match[2]}-${match[3]}`;
+    }
+    
+    return text;
+  };
+  
+  // Formatar data
+  const formatDate = (text: string) => {
+    const cleaned = text.replace(/\D/g, '');
+    const match = cleaned.match(/^(\d{2})(\d{2})(\d{4})$/);
+    
+    if (match) {
+      return `${match[1]}/${match[2]}/${match[3]}`;
+    }
+    
+    return text;
+  };
+  
+  // Formatar CPF
+  const formatCPF = (text: string) => {
+    const cleaned = text.replace(/\D/g, '');
+    const match = cleaned.match(/^(\d{3})(\d{3})(\d{3})(\d{2})$/);
+    
+    if (match) {
+      return `${match[1]}.${match[2]}.${match[3]}-${match[4]}`;
+    }
+    
+    return text;
+  };
+  
+  // Avançar para próxima etapa
+  const handleNextStep = () => {
     if (validateFields()) {
-      if (currentStep < 2) {
-        setCurrentStep(currentStep + 1);
+      if (currentStep === 1) {
+        // Na última etapa, pedir senha para confirmar alterações
+        setCurrentStep(2);
       } else {
-        handleSaveProfile();
+        setCurrentStep(currentStep + 1);
       }
     }
   };
   
-  // Voltar para a etapa anterior
-  const handleBack = () => {
-    if (currentStep > 0) {
-      setCurrentStep(currentStep - 1);
-    } else {
-      handleClose();
-    }
+  // Voltar para etapa anterior
+  const handlePrevStep = () => {
+    setCurrentStep(currentStep - 1);
   };
   
   // Salvar perfil
@@ -197,6 +195,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
       // Fechar modal e notificar sucesso
       onSuccess();
       handleClose();
+      Alert.alert('Sucesso', 'Perfil atualizado com sucesso!');
     } catch (error) {
       console.error('Erro ao atualizar perfil:', error);
       setErrors({
@@ -214,9 +213,9 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
       case 0:
         return (
           <>
-            <Text style={styles.stepTitle}>Informações pessoais</Text>
+            <Text style={styles.stepTitle}>Informações básicas</Text>
             <Text style={styles.stepDescription}>
-              Atualize suas informações pessoais
+              Atualize suas informações básicas
             </Text>
             
             <View style={styles.inputContainer}>
@@ -248,37 +247,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
             </View>
             {errors.phone && <HelperText type="error">{errors.phone}</HelperText>}
             
-            <View style={styles.inputContainer}>
-              <Ionicons name="calendar-outline" size={20} color={COLORS.secondary} style={styles.inputIcon} />
-              <TextInput
-                style={styles.input}
-                placeholder="Data de nascimento (DD/MM/AAAA)"
-                placeholderTextColor={COLORS.textSecondary}
-                value={birthDate}
-                onChangeText={(text) => setBirthDate(formatBirthDate(text))}
-                keyboardType="numeric"
-                error={!!errors.birthDate}
-                disabled={isLoading}
-              />
-            </View>
-            {errors.birthDate && <HelperText type="error">{errors.birthDate}</HelperText>}
-            
-            <View style={styles.inputContainer}>
-              <Ionicons name="card-outline" size={20} color={COLORS.secondary} style={styles.inputIcon} />
-              <TextInput
-                style={styles.input}
-                placeholder="CPF (opcional)"
-                placeholderTextColor={COLORS.textSecondary}
-                value={cpf}
-                onChangeText={(text) => setCpf(formatCPF(text))}
-                keyboardType="numeric"
-                error={!!errors.cpf}
-                disabled={isLoading}
-              />
-            </View>
-            {errors.cpf && <HelperText type="error">{errors.cpf}</HelperText>}
-            
-            <Text style={styles.labelText}>Gênero (opcional)</Text>
+            <Text style={styles.labelText}>Gênero</Text>
             <View style={styles.optionsContainer}>
               <TouchableOpacity
                 style={[styles.optionButton, gender === 'masculino' && styles.selectedOption]}
@@ -440,9 +409,8 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                 </Text>
               </TouchableOpacity>
             </View>
-            {errors.monthlyIncome && <HelperText type="error">{errors.monthlyIncome}</HelperText>}
             
-            <Text style={styles.labelText}>Objetivo financeiro principal</Text>
+            <Text style={styles.labelText}>Objetivo financeiro</Text>
             <View style={styles.optionsContainer}>
               <TouchableOpacity
                 style={[styles.optionButton, financialGoal === 'economizar' && styles.selectedOption]}
@@ -484,62 +452,22 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                 </Text>
               </TouchableOpacity>
             </View>
-            {errors.financialGoal && <HelperText type="error">{errors.financialGoal}</HelperText>}
           </>
         );
       
       case 2:
         return (
           <>
-            <Text style={styles.stepTitle}>Confirmar alterações</Text>
+            <Text style={styles.stepTitle}>Confirmação</Text>
             <Text style={styles.stepDescription}>
               Digite sua senha para confirmar as alterações
             </Text>
-            
-            <View style={styles.summaryContainer}>
-              <Text style={styles.summaryTitle}>Resumo das alterações:</Text>
-              
-              <View style={styles.summaryItem}>
-                <Text style={styles.summaryLabel}>Nome:</Text>
-                <Text style={styles.summaryValue}>{name}</Text>
-              </View>
-              
-              <View style={styles.summaryItem}>
-                <Text style={styles.summaryLabel}>Telefone:</Text>
-                <Text style={styles.summaryValue}>{phone}</Text>
-              </View>
-              
-              <View style={styles.summaryItem}>
-                <Text style={styles.summaryLabel}>Profissão:</Text>
-                <Text style={styles.summaryValue}>{profession}</Text>
-              </View>
-              
-              <View style={styles.summaryItem}>
-                <Text style={styles.summaryLabel}>Renda mensal:</Text>
-                <Text style={styles.summaryValue}>
-                  {monthlyIncome === 'ate_2000' && 'Até R$ 2.000'}
-                  {monthlyIncome === '2000_5000' && 'R$ 2.000 a R$ 5.000'}
-                  {monthlyIncome === '5000_10000' && 'R$ 5.000 a R$ 10.000'}
-                  {monthlyIncome === 'acima_10000' && 'Acima de R$ 10.000'}
-                </Text>
-              </View>
-              
-              <View style={styles.summaryItem}>
-                <Text style={styles.summaryLabel}>Objetivo:</Text>
-                <Text style={styles.summaryValue}>
-                  {financialGoal === 'economizar' && 'Economizar'}
-                  {financialGoal === 'investir' && 'Investir'}
-                  {financialGoal === 'controlar_gastos' && 'Controlar gastos'}
-                  {financialGoal === 'quitar_dividas' && 'Quitar dívidas'}
-                </Text>
-              </View>
-            </View>
             
             <View style={styles.inputContainer}>
               <Ionicons name="lock-closed-outline" size={20} color={COLORS.secondary} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
-                placeholder="Digite sua senha para confirmar"
+                placeholder="Senha"
                 placeholderTextColor={COLORS.textSecondary}
                 value={password}
                 onChangeText={setPassword}
@@ -549,17 +477,9 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
               />
             </View>
             {errors.password && <HelperText type="error">{errors.password}</HelperText>}
-            
-            {errors.general && (
-              <View style={styles.errorContainer}>
-                <Text style={styles.errorText}>{errors.general}</Text>
-              </View>
-            )}
+            {errors.general && <HelperText type="error">{errors.general}</HelperText>}
           </>
         );
-      
-      default:
-        return null;
     }
   };
   
@@ -614,37 +534,28 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
           </ScrollView>
           
           <View style={styles.footer}>
-            <TouchableOpacity
-              style={styles.backButton}
-              onPress={handleBack}
-              disabled={isLoading}
-            >
-              <Text style={styles.backButtonText}>
-                {currentStep === 0 ? 'Cancelar' : 'Voltar'}
-              </Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              onPress={handleNext}
-              disabled={isLoading}
-              activeOpacity={0.8}
-              style={styles.nextButton}
-            >
-              <LinearGradient
-                colors={[COLORS.secondary, COLORS.primary]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.gradientButton}
+            {currentStep > 0 && (
+              <Button
+                mode="outlined"
+                onPress={handlePrevStep}
+                disabled={isLoading}
+                style={styles.footerButton}
+                labelStyle={styles.footerButtonLabel}
               >
-                {isLoading ? (
-                  <ActivityIndicator color={COLORS.white} size="small" />
-                ) : (
-                  <Text style={styles.buttonText}>
-                    {currentStep === 2 ? 'Salvar' : 'Próximo'}
-                  </Text>
-                )}
-              </LinearGradient>
-            </TouchableOpacity>
+                Voltar
+              </Button>
+            )}
+            
+            <Button
+              mode="contained"
+              onPress={currentStep === 2 ? handleSaveProfile : handleNextStep}
+              loading={isLoading}
+              disabled={isLoading}
+              style={styles.footerButton}
+              labelStyle={styles.footerButtonLabel}
+            >
+              {currentStep === 2 ? 'Salvar' : 'Próximo'}
+            </Button>
           </View>
         </View>
       </KeyboardAvoidingView>
@@ -655,67 +566,64 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   modalContent: {
-    width: width * 0.9,
-    maxHeight: '90%',
+    flex: 1,
     backgroundColor: COLORS.background,
-    borderRadius: 20,
-    overflow: 'hidden',
+    marginTop: 60,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
   },
   header: {
     paddingTop: 20,
-    paddingBottom: 15,
-    alignItems: 'center',
+    paddingBottom: 20,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
   },
   closeButton: {
     position: 'absolute',
-    top: 10,
-    right: 10,
+    top: 20,
+    right: 20,
     zIndex: 10,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   title: {
-    fontSize: TYPO.size.lg,
-    fontFamily: TYPO.family.bold,
     color: COLORS.white,
-    marginBottom: LAYOUT.spacing.sm,
+    fontSize: TYPO.size.xl,
+    fontFamily: TYPO.family.bold,
+    textAlign: 'center',
+    marginBottom: 10,
   },
   stepContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginTop: LAYOUT.spacing.xs,
+    alignItems: 'center',
+    marginTop: 10,
   },
   stepDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.4)',
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
     marginHorizontal: 4,
   },
   activeStepDot: {
     backgroundColor: COLORS.white,
-    width: 24,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
   },
   scrollView: {
-    maxHeight: '70%',
+    flex: 1,
   },
   scrollContent: {
     padding: LAYOUT.spacing.lg,
   },
   stepTitle: {
     fontSize: TYPO.size.lg,
-    fontFamily: TYPO.family.semibold,
+    fontFamily: TYPO.family.bold,
     color: COLORS.text,
-    marginBottom: LAYOUT.spacing.xs,
+    marginBottom: 8,
   },
   stepDescription: {
     fontSize: TYPO.size.sm,
@@ -726,136 +634,72 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.surface,
+    backgroundColor: COLORS.white,
     borderRadius: 12,
-    marginBottom: LAYOUT.spacing.xs,
-    paddingHorizontal: LAYOUT.spacing.md,
+    marginBottom: LAYOUT.spacing.sm,
     borderWidth: 1,
-    borderColor: COLORS.border,
-    elevation: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 1,
+    borderColor: COLORS.divider,
   },
   inputIcon: {
-    marginRight: LAYOUT.spacing.sm,
+    marginLeft: LAYOUT.spacing.md,
   },
   input: {
     flex: 1,
-    color: COLORS.text,
-    fontFamily: TYPO.family.regular,
-    paddingVertical: LAYOUT.spacing.md,
-    fontSize: TYPO.size.md,
     backgroundColor: 'transparent',
+    fontSize: TYPO.size.md,
+    fontFamily: TYPO.family.regular,
+    color: COLORS.text,
+    paddingHorizontal: LAYOUT.spacing.md,
+    paddingVertical: LAYOUT.spacing.sm,
   },
   labelText: {
     fontSize: TYPO.size.sm,
     fontFamily: TYPO.family.medium,
     color: COLORS.text,
     marginTop: LAYOUT.spacing.md,
-    marginBottom: LAYOUT.spacing.xs,
+    marginBottom: LAYOUT.spacing.sm,
   },
   optionsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginBottom: LAYOUT.spacing.md,
+    marginHorizontal: -LAYOUT.spacing.xs,
   },
   optionButton: {
-    backgroundColor: COLORS.surface,
-    borderRadius: 20,
-    paddingVertical: LAYOUT.spacing.sm,
+    backgroundColor: COLORS.white,
+    borderRadius: 8,
     paddingHorizontal: LAYOUT.spacing.md,
-    marginRight: LAYOUT.spacing.sm,
-    marginBottom: LAYOUT.spacing.sm,
+    paddingVertical: LAYOUT.spacing.sm,
+    margin: LAYOUT.spacing.xs,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: COLORS.divider,
   },
   selectedOption: {
-    backgroundColor: 'rgba(108, 99, 255, 0.1)',
+    backgroundColor: COLORS.secondary,
     borderColor: COLORS.secondary,
   },
   optionText: {
-    color: COLORS.text,
-    fontFamily: TYPO.family.regular,
     fontSize: TYPO.size.sm,
+    fontFamily: TYPO.family.medium,
+    color: COLORS.text,
   },
   selectedOptionText: {
-    color: COLORS.secondary,
-    fontFamily: TYPO.family.medium,
-  },
-  summaryContainer: {
-    backgroundColor: COLORS.surface,
-    borderRadius: 12,
-    padding: LAYOUT.spacing.md,
-    marginBottom: LAYOUT.spacing.lg,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  summaryTitle: {
-    fontSize: TYPO.size.md,
-    fontFamily: TYPO.family.semibold,
-    color: COLORS.text,
-    marginBottom: LAYOUT.spacing.md,
-  },
-  summaryItem: {
-    flexDirection: 'row',
-    marginBottom: LAYOUT.spacing.sm,
-  },
-  summaryLabel: {
-    fontSize: TYPO.size.sm,
-    fontFamily: TYPO.family.medium,
-    color: COLORS.text,
-    width: 100,
-  },
-  summaryValue: {
-    fontSize: TYPO.size.sm,
-    fontFamily: TYPO.family.regular,
-    color: COLORS.textSecondary,
-    flex: 1,
-  },
-  errorContainer: {
-    backgroundColor: 'rgba(215, 38, 61, 0.1)',
-    borderRadius: 8,
-    padding: LAYOUT.spacing.md,
-    marginTop: LAYOUT.spacing.md,
-  },
-  errorText: {
-    color: COLORS.danger,
-    fontFamily: TYPO.family.medium,
-    fontSize: TYPO.size.sm,
+    color: COLORS.white,
   },
   footer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    padding: LAYOUT.spacing.md,
+    padding: LAYOUT.spacing.lg,
     borderTopWidth: 1,
-    borderTopColor: COLORS.border,
+    borderTopColor: COLORS.divider,
+    backgroundColor: COLORS.white,
   },
-  backButton: {
-    paddingVertical: LAYOUT.spacing.md,
-    paddingHorizontal: LAYOUT.spacing.lg,
-  },
-  backButtonText: {
-    color: COLORS.textSecondary,
-    fontFamily: TYPO.family.medium,
-    fontSize: TYPO.size.md,
-  },
-  nextButton: {
-    borderRadius: 12,
-    overflow: 'hidden',
+  footerButton: {
     flex: 1,
-    marginLeft: LAYOUT.spacing.md,
+    marginHorizontal: LAYOUT.spacing.xs,
   },
-  gradientButton: {
-    paddingVertical: LAYOUT.spacing.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  buttonText: {
-    color: COLORS.white,
+  footerButtonLabel: {
     fontSize: TYPO.size.md,
-    fontFamily: TYPO.family.semibold,
+    fontFamily: TYPO.family.medium,
   },
 });
 

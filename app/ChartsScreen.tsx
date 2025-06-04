@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, TouchableOpacity, ScrollView, Dimensions, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, ScrollView, Dimensions, ActivityIndicator, Alert } from 'react-native';
 import { Text, Button } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -57,151 +57,135 @@ const ChartsScreen = () => {
   }, [selectedPeriod, selectedMonth, selectedYear]);
   
   const loadData = async () => {
-    if (!auth.currentUser) {
-      console.error('Usuário não autenticado');
-      return;
-    }
+    if (!auth.currentUser) return;
     
     setIsLoading(true);
     
     try {
       const userId = auth.currentUser.uid;
       
-      // Carregar dados de acordo com o período selecionado
       if (selectedPeriod === 'month') {
-        // Dados para o gráfico de pizza de despesas
-        const expenseCategoriesData = await getTransactionsByCategory(userId, selectedYear, selectedMonth);
-        setExpenseData(expenseCategoriesData.map((item, index) => ({
-          name: item.category,
-          value: item.amount,
-          color: getCategoryColor(item.category, index)
-        })));
+        // Dados para o mês selecionado
+        const startDate = new Date(selectedYear, selectedMonth, 1).toISOString();
+        const endDate = new Date(selectedYear, selectedMonth + 1, 0).toISOString();
         
-        // Buscar todas as despesas e receitas do mês
-        const allExpenses = await getTransactionsByPeriod(userId, selectedYear, selectedMonth);
-        const allIncomes = await getTransactionsByPeriod(userId, selectedYear, selectedMonth, 'income');
+        // Buscar todas as transações do mês
+        const transactions = await getTransactionsByPeriod(userId, startDate, endDate);
         
-        // Filtrar apenas para o mês selecionado
-        const monthExpenses = allExpenses.filter(expense => {
-          const expenseDate = new Date(expense.date);
-          return expenseDate.getFullYear() === selectedYear && 
-                 expenseDate.getMonth() === selectedMonth;
-        });
+        // Separar receitas e despesas
+        const expenses = transactions.filter(t => t.type === 'expense');
+        const incomes = transactions.filter(t => t.type === 'income');
         
-        const monthIncomes = allIncomes.filter(income => {
-          const incomeDate = new Date(income.date);
-          return incomeDate.getFullYear() === selectedYear && 
-                 incomeDate.getMonth() === selectedMonth;
-        });
+        // Agrupar despesas por categoria
+        const expenseByCategory = expenses.reduce((acc, expense) => {
+          const category = expense.category || 'Outros';
+          acc[category] = (acc[category] || 0) + expense.amount;
+          return acc;
+        }, {} as Record<string, number>);
         
-        // Agrupar por dia do mês
+        // Preparar dados para o gráfico de pizza
+        const expenseData = Object.entries(expenseByCategory).map(([category, amount], index) => ({
+          name: category,
+          value: amount,
+          color: getCategoryColor(category, index)
+        }));
+        
+        setExpenseData(expenseData);
+        
+        // Agrupar por dia
         const dailyData: Record<number, {income: number, expense: number}> = {};
-        
-        // Inicializar todos os dias do mês
         const daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
+        
+        // Inicializar todos os dias
         for (let day = 1; day <= daysInMonth; day++) {
           dailyData[day] = { income: 0, expense: 0 };
         }
         
-        // Somar despesas por dia
-        monthExpenses.forEach(expense => {
-          const day = new Date(expense.date).getDate();
-          if (dailyData[day]) {
-            dailyData[day].expense += expense.amount;
+        // Somar valores por dia
+        transactions.forEach(transaction => {
+          const day = new Date(transaction.date).getDate();
+          if (transaction.type === 'income') {
+            dailyData[day].income += transaction.amount;
+          } else {
+            dailyData[day].expense += transaction.amount;
           }
         });
         
-        // Somar receitas por dia
-        monthIncomes.forEach(income => {
-          const day = new Date(income.date).getDate();
-          if (dailyData[day]) {
-            dailyData[day].income += income.amount;
-          }
-        });
-        
-        // Dados para o gráfico de barras de receitas e despesas (apenas para o mês selecionado)
-        const dailyIncomeExpenseData = Object.entries(dailyData).map(([day, data]) => ({
+        // Preparar dados para o gráfico de barras
+        const incomeExpenseData = Object.entries(dailyData).map(([day, data]) => ({
           month: `${day}/${selectedMonth + 1}`,
           income: data.income,
           expense: data.expense
         }));
         
-        // Ordenar por dia
-        dailyIncomeExpenseData.sort((a, b) => {
-          const dayA = parseInt(a.month.split('/')[0]);
-          const dayB = parseInt(b.month.split('/')[0]);
-          return dayA - dayB;
-        });
+        setIncomeExpenseData(incomeExpenseData);
         
-        setIncomeExpenseData(dailyIncomeExpenseData);
+        // Calcular totais
+        const totalIncome = incomes.reduce((sum, t) => sum + t.amount, 0);
+        const totalExpense = expenses.reduce((sum, t) => sum + t.amount, 0);
         
-        // Totais para o mês selecionado
-        const income = await getTotalIncomesByMonth(userId, selectedYear, selectedMonth);
-        const expense = await getTotalExpensesByMonth(userId, selectedYear, selectedMonth);
-        const monthBalance = await getBalanceByMonth(userId, selectedYear, selectedMonth);
+        setTotalIncome(totalIncome);
+        setTotalExpense(totalExpense);
+        setBalance(totalIncome - totalExpense);
         
-        setTotalIncome(income);
-        setTotalExpense(expense);
-        setBalance(monthBalance);
-        
-      } else if (selectedPeriod === 'year') {
+      } else {
         // Dados para o ano inteiro
         const monthlyData = [];
+        const yearExpenses: Record<string, number> = {};
         
-        // Preparar dados mensais para o ano
+        // Preparar dados mensais
         for (let month = 0; month < 12; month++) {
-          const income = await getTotalIncomesByMonth(userId, selectedYear, month);
-          const expense = await getTotalExpensesByMonth(userId, selectedYear, month);
+          const startDate = new Date(selectedYear, month, 1).toISOString();
+          const endDate = new Date(selectedYear, month + 1, 0).toISOString();
+          
+          const monthTransactions = await getTransactionsByPeriod(userId, startDate, endDate);
+          
+          // Agrupar despesas por categoria para o ano
+          monthTransactions
+            .filter(t => t.type === 'expense')
+            .forEach(expense => {
+              const category = expense.category || 'Outros';
+              yearExpenses[category] = (yearExpenses[category] || 0) + expense.amount;
+            });
+          
+          const monthIncome = monthTransactions
+            .filter(t => t.type === 'income')
+            .reduce((sum, t) => sum + t.amount, 0);
+            
+          const monthExpense = monthTransactions
+            .filter(t => t.type === 'expense')
+            .reduce((sum, t) => sum + t.amount, 0);
           
           monthlyData.push({
             month: getMonthAbbreviation(month),
-            income,
-            expense
+            income: monthIncome,
+            expense: monthExpense
           });
         }
         
         setIncomeExpenseData(monthlyData);
         
-        // Calcular totais para o ano
-        const yearIncome = monthlyData.reduce((sum, item) => sum + item.income, 0);
-        const yearExpense = monthlyData.reduce((sum, item) => sum + item.expense, 0);
-        const yearBalance = yearIncome - yearExpense;
+        // Calcular totais do ano
+        const yearIncome = monthlyData.reduce((sum, m) => sum + m.income, 0);
+        const yearExpense = monthlyData.reduce((sum, m) => sum + m.expense, 0);
         
         setTotalIncome(yearIncome);
         setTotalExpense(yearExpense);
-        setBalance(yearBalance);
+        setBalance(yearIncome - yearExpense);
         
-        // Dados para o gráfico de pizza de despesas (categorias do ano)
-        let yearExpenses: {category: string, amount: number}[] = [];
+        // Preparar dados do gráfico de pizza para o ano
+        const yearExpenseData = Object.entries(yearExpenses)
+          .sort((a, b) => b[1] - a[1]) // Ordenar por valor decrescente
+          .map(([category, amount], index) => ({
+            name: category,
+            value: amount,
+            color: getCategoryColor(category, index)
+          }));
         
-        for (let month = 0; month < 12; month++) {
-          const monthExpenses = await getTransactionsByCategory(userId, selectedYear, month);
-          
-          // Agrupar por categoria
-          monthExpenses.forEach(item => {
-            const existingCategory = yearExpenses.find(exp => exp.category === item.category);
-            if (existingCategory) {
-              existingCategory.amount += item.amount;
-            } else {
-              yearExpenses.push({
-                category: item.category,
-                amount: item.amount
-              });
-            }
-          });
-        }
-        
-        // Ordenar por valor
-        yearExpenses = yearExpenses.sort((a, b) => b.amount - a.amount);
-        
-        setExpenseData(yearExpenses.map((item, index) => ({
-          name: item.category,
-          value: item.amount,
-          color: getCategoryColor(item.category, index)
-        })));
+        setExpenseData(yearExpenseData);
       }
     } catch (error) {
-      console.error('Erro ao carregar dados:', error);
+      Alert.alert('Erro', 'Não foi possível carregar os dados.');
     } finally {
       setIsLoading(false);
     }

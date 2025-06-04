@@ -50,6 +50,10 @@ export interface Income {
   updatedAt?: string;
 }
 
+// Cache para transações
+let transactionsCache: { [userId: string]: { transactions: Transaction[], timestamp: number } } = {};
+const CACHE_DURATION = 30000; // 30 segundos
+
 /**
  * Salva uma nova transação (despesa ou receita)
  * @param userId ID do usuário
@@ -63,7 +67,6 @@ export async function saveTransaction(userId: string, transaction: Omit<Transact
     const transactionId = newTransactionRef.key as string;
     
     const now = new Date().toISOString();
-    
     const completeTransaction = {
       ...transaction,
       id: transactionId,
@@ -71,16 +74,43 @@ export async function saveTransaction(userId: string, transaction: Omit<Transact
       updatedAt: now
     };
     
-    await set(newTransactionRef, completeTransaction);
-    
-    // Atualizar o saldo do usuário
+    // Atualizar saldo e salvar transação em paralelo
     const amountChange = transaction.type === 'income' ? transaction.amount : -transaction.amount;
-    await updateUserBalance(userId, amountChange);
     
-    // Se houver alocação para meta, atualizar a meta
-    if (transaction.goalAllocation && transaction.type === 'income') {
-      await allocateAmountToGoal(userId, transaction.goalAllocation, transaction.amount, transactionId);
+    await Promise.all([
+      set(newTransactionRef, completeTransaction),
+      updateUserBalance(userId, amountChange)
+    ]);
+
+    // Atualizar cache local imediatamente
+    const cached = transactionsCache[userId];
+    if (cached) {
+      cached.transactions.unshift(completeTransaction);
+      cached.timestamp = Date.now();
     }
+
+    // Operações secundárias em background sem esperar
+    setTimeout(() => {
+      Promise.all([
+        createRecurringTransactionNotification(
+          userId,
+          transaction.type,
+          transaction.amount,
+          transactionId
+        ).catch(() => {}),
+        
+        calculateAndSaveMonthlyStatistics(
+          userId,
+          new Date(transaction.date).getFullYear(),
+          new Date(transaction.date).getMonth()
+        ).catch(() => {}),
+        
+        transaction.goalAllocation && transaction.type === 'income'
+          ? allocateAmountToGoal(userId, transaction.goalAllocation, transaction.amount, transactionId)
+              .catch(() => {})
+          : Promise.resolve()
+      ]).catch(() => {});
+    }, 0);
     
     return transactionId;
   } catch (error) {
@@ -94,27 +124,45 @@ export async function saveTransaction(userId: string, transaction: Omit<Transact
  * @param userId ID do usuário
  * @returns Array de transações
  */
-export async function getTransactions(userId: string): Promise<Transaction[]> {
+export async function getTransactions(userId: string, forceRefresh = false): Promise<Transaction[]> {
   try {
+    // Verificar cache
+    const cached = transactionsCache[userId];
+    const now = Date.now();
+    
+    if (!forceRefresh && cached && (now - cached.timestamp) < CACHE_DURATION) {
+      return cached.transactions;
+    }
+
     const transactionsRef = ref(rtdb, `users/${userId}/transactions`);
     const snapshot = await get(transactionsRef);
     
     if (!snapshot.exists()) {
+      transactionsCache[userId] = { transactions: [], timestamp: now };
       return [];
     }
     
     const transactions: Transaction[] = [];
     snapshot.forEach((childSnapshot) => {
       const transaction = childSnapshot.val() as Transaction;
+      transaction.id = childSnapshot.key;
       transactions.push(transaction);
     });
     
-    // Ordenar por data (mais recente primeiro)
-    return transactions.sort((a, b) => 
-      new Date(b.date).getTime() - new Date(a.date).getTime()
-    );
+    // Ordenar por data em ordem decrescente (mais recente primeiro)
+    const sortedTransactions = transactions.sort((a, b) => {
+      const dateA = new Date(a.date).getTime();
+      const dateB = new Date(b.date).getTime();
+      return dateB - dateA;
+    });
+    
+    transactionsCache[userId] = { 
+      transactions: sortedTransactions, 
+      timestamp: now 
+    };
+    
+    return sortedTransactions;
   } catch (error) {
-    console.error('Erro ao buscar transações:', error);
     throw error;
   }
 }
@@ -127,24 +175,8 @@ export async function getTransactions(userId: string): Promise<Transaction[]> {
  */
 export async function getTransactionsByType(userId: string, type: 'expense' | 'income'): Promise<Transaction[]> {
   try {
-    const transactionsRef = ref(rtdb, `users/${userId}/transactions`);
-    const transactionsQuery = query(transactionsRef, orderByChild('type'), equalTo(type));
-    const snapshot = await get(transactionsQuery);
-    
-    if (!snapshot.exists()) {
-      return [];
-    }
-    
-    const transactions: Transaction[] = [];
-    snapshot.forEach((childSnapshot) => {
-      const transaction = childSnapshot.val() as Transaction;
-      transactions.push(transaction);
-    });
-    
-    // Ordenar por data (mais recente primeiro)
-    return transactions.sort((a, b) => 
-      new Date(b.date).getTime() - new Date(a.date).getTime()
-    );
+    const transactions = await getTransactions(userId);
+    return transactions.filter(transaction => transaction.type === type);
   } catch (error) {
     console.error(`Erro ao buscar transações do tipo ${type}:`, error);
     throw error;
@@ -161,16 +193,29 @@ export async function getTransactionsByType(userId: string, type: 'expense' | 'i
 export async function getTransactionsByPeriod(userId: string, startDate: string, endDate: string): Promise<Transaction[]> {
   try {
     const transactions = await getTransactions(userId);
+    const start = new Date(startDate);
+    const end = new Date(endDate);
     
-    return transactions.filter(transaction => {
-      const transactionDate = new Date(transaction.date).getTime();
-      const start = new Date(startDate).getTime();
-      const end = new Date(endDate).getTime();
-      
+    // Ajustar o horário do final do dia para incluir todo o dia
+    end.setHours(23, 59, 59, 999);
+    
+    // Ajustar o horário do início do dia
+    start.setHours(0, 0, 0, 0);
+    
+    const filteredTransactions = transactions.filter(transaction => {
+      const transactionDate = new Date(transaction.date);
+      // Ajustar o horário da transação para comparação
+      transactionDate.setHours(12, 0, 0, 0);
       return transactionDate >= start && transactionDate <= end;
     });
+
+    // Ordenar por data em ordem decrescente (mais recente primeiro)
+    return filteredTransactions.sort((a, b) => {
+      const dateA = new Date(a.date).getTime();
+      const dateB = new Date(b.date).getTime();
+      return dateB - dateA;
+    });
   } catch (error) {
-    console.error('Erro ao buscar transações por período:', error);
     throw error;
   }
 }
@@ -295,11 +340,18 @@ export async function searchTransactions(userId: string, searchText: string): Pr
  */
 export async function getBalanceByMonth(userId: string, year: number, month: number): Promise<number> {
   try {
-    const expenses = await getTransactionsByType(userId, 'expense');
-    const incomes = await getTransactionsByType(userId, 'income');
+    const startDate = new Date(year, month, 1);
+    const endDate = new Date(year, month + 1, 0);
     
-    const totalExpense = getTotalExpensesByMonth(expenses, year, month);
-    const totalIncome = getTotalIncomesByMonth(incomes, year, month);
+    const transactions = await getTransactionsByPeriod(userId, startDate.toISOString(), endDate.toISOString());
+    
+    const totalExpense = transactions
+      .filter(t => t.type === 'expense')
+      .reduce((sum, t) => sum + t.amount, 0);
+      
+    const totalIncome = transactions
+      .filter(t => t.type === 'income')
+      .reduce((sum, t) => sum + t.amount, 0);
     
     return totalIncome - totalExpense;
   } catch (error) {
@@ -310,38 +362,21 @@ export async function getBalanceByMonth(userId: string, year: number, month: num
 
 export async function saveExpense(userId: string, expense: Omit<Expense, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
   try {
-    const expenseRef = ref(rtdb, `users/${userId}/expenses`);
-    const newExpenseRef = push(expenseRef);
-    const now = new Date().toISOString();
-
-    const newExpense = {
-      ...expense,
-      id: newExpenseRef.key,
-      createdAt: now,
-      updatedAt: now
+    console.log('saveExpense: Iniciando salvamento de despesa');
+    
+    const transaction: Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'> = {
+      type: 'expense',
+      amount: expense.amount,
+      description: expense.description,
+      category: expense.category,
+      date: expense.date
     };
 
-    await set(newExpenseRef, newExpense);
-
-    // Atualizar saldo do usuário
-    const userRef = ref(rtdb, `users/${userId}`);
-    const userSnapshot = await get(userRef);
-    const currentBalance = userSnapshot.val()?.balance || 0;
-    await update(userRef, { balance: currentBalance - expense.amount });
-
-    // Criar notificação
-    await createRecurringTransactionNotification(
-      userId,
-      'expense',
-      expense.amount,
-      newExpenseRef.key!
-    );
-
-    // Atualizar estatísticas
-    const expenseDate = new Date(expense.date);
-    await calculateAndSaveMonthlyStatistics(userId, expenseDate.getFullYear(), expenseDate.getMonth());
-
-    return newExpenseRef.key!;
+    console.log('saveExpense: Convertendo para transação:', transaction);
+    const transactionId = await saveTransaction(userId, transaction);
+    console.log('saveExpense: Transação salva com sucesso, ID:', transactionId);
+    
+    return transactionId;
   } catch (error) {
     console.error('Erro ao salvar despesa:', error);
     throw error;
@@ -350,59 +385,50 @@ export async function saveExpense(userId: string, expense: Omit<Expense, 'id' | 
 
 export async function saveIncome(userId: string, income: Omit<Income, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
   try {
-    const incomeRef = ref(rtdb, `users/${userId}/incomes`);
-    const newIncomeRef = push(incomeRef);
-    const now = new Date().toISOString();
-
-    const newIncome = {
-      ...income,
-      id: newIncomeRef.key,
-      createdAt: now,
-      updatedAt: now
+    console.log('saveIncome: Iniciando salvamento de receita');
+    
+    const transaction: Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'> = {
+      type: 'income',
+      amount: income.amount,
+      description: income.description,
+      source: income.source,
+      date: income.date
     };
 
-    await set(newIncomeRef, newIncome);
-
-    // Atualizar saldo do usuário
-    const userRef = ref(rtdb, `users/${userId}`);
-    const userSnapshot = await get(userRef);
-    const currentBalance = userSnapshot.val()?.balance || 0;
-    await update(userRef, { balance: currentBalance + income.amount });
-
-    // Criar notificação
-    await createRecurringTransactionNotification(
-      userId,
-      'income',
-      income.amount,
-      newIncomeRef.key!
-    );
-
-    // Atualizar estatísticas
-    const incomeDate = new Date(income.date);
-    await calculateAndSaveMonthlyStatistics(userId, incomeDate.getFullYear(), incomeDate.getMonth());
-
-    return newIncomeRef.key!;
+    console.log('saveIncome: Convertendo para transação:', transaction);
+    const transactionId = await saveTransaction(userId, transaction);
+    console.log('saveIncome: Transação salva com sucesso, ID:', transactionId);
+    
+    return transactionId;
   } catch (error) {
     console.error('Erro ao salvar receita:', error);
     throw error;
   }
 }
 
+/**
+ * Obtém despesas do usuário
+ * @param userId ID do usuário
+ * @returns Array de despesas
+ */
 export async function getExpenses(userId: string): Promise<Expense[]> {
   try {
-    const expensesRef = ref(rtdb, `users/${userId}/expenses`);
-    const snapshot = await get(expensesRef);
+    console.log('getExpenses: Buscando despesas do usuário:', userId);
+    const transactions = await getTransactions(userId);
     
-    if (!snapshot.exists()) {
-      return [];
-    }
+    const expenses = transactions
+      .filter(transaction => transaction.type === 'expense')
+      .map(transaction => ({
+        id: transaction.id,
+        amount: transaction.amount,
+        description: transaction.description,
+        category: transaction.category || '',
+        date: transaction.date,
+        createdAt: transaction.createdAt,
+        updatedAt: transaction.updatedAt
+      }));
     
-    const expenses: Expense[] = [];
-    snapshot.forEach((childSnapshot) => {
-      const expense = childSnapshot.val() as Expense;
-      expenses.push(expense);
-    });
-    
+    console.log('getExpenses: Total de despesas encontradas:', expenses.length);
     return expenses.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   } catch (error) {
     console.error('Erro ao buscar despesas:', error);
@@ -410,21 +436,38 @@ export async function getExpenses(userId: string): Promise<Expense[]> {
   }
 }
 
+/**
+ * Obtém receitas do usuário
+ * @param userId ID do usuário
+ * @returns Array de receitas
+ */
 export async function getIncomes(userId: string): Promise<Income[]> {
   try {
-    const incomesRef = ref(rtdb, `users/${userId}/incomes`);
-    const snapshot = await get(incomesRef);
+    console.log('getIncomes: Buscando receitas do usuário:', userId);
+    const transactionsRef = ref(rtdb, `users/${userId}/transactions`);
+    const transactionsQuery = query(transactionsRef, orderByChild('type'), equalTo('income'));
+    const snapshot = await get(transactionsQuery);
     
     if (!snapshot.exists()) {
+      console.log('getIncomes: Nenhuma receita encontrada');
       return [];
     }
     
     const incomes: Income[] = [];
     snapshot.forEach((childSnapshot) => {
-      const income = childSnapshot.val() as Income;
-      incomes.push(income);
+      const transaction = childSnapshot.val() as Transaction;
+      incomes.push({
+        id: transaction.id,
+        amount: transaction.amount,
+        description: transaction.description,
+        source: transaction.source || '',
+        date: transaction.date,
+        createdAt: transaction.createdAt,
+        updatedAt: transaction.updatedAt
+      });
     });
     
+    console.log('getIncomes: Total de receitas encontradas:', incomes.length);
     return incomes.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   } catch (error) {
     console.error('Erro ao buscar receitas:', error);
@@ -434,17 +477,18 @@ export async function getIncomes(userId: string): Promise<Income[]> {
 
 export async function deleteExpense(userId: string, expenseId: string): Promise<void> {
   try {
-    const expenseRef = ref(rtdb, `users/${userId}/expenses/${expenseId}`);
+    const expenseRef = ref(rtdb, `users/${userId}/transactions/${expenseId}`);
     const snapshot = await get(expenseRef);
     
     if (!snapshot.exists()) {
       throw new Error('Despesa não encontrada');
     }
     
-    const expense = snapshot.val() as Expense;
+    const expense = snapshot.val() as Transaction;
     
     // Reverter o efeito no saldo do usuário
-    await updateUserBalance(userId, expense.amount);
+    const amountChange = expense.type === 'income' ? -expense.amount : expense.amount;
+    await updateUserBalance(userId, amountChange);
     
     // Excluir a despesa
     await remove(expenseRef);
@@ -456,22 +500,32 @@ export async function deleteExpense(userId: string, expenseId: string): Promise<
 
 export async function deleteIncome(userId: string, incomeId: string): Promise<void> {
   try {
-    const incomeRef = ref(rtdb, `users/${userId}/incomes/${incomeId}`);
+    const incomeRef = ref(rtdb, `users/${userId}/transactions/${incomeId}`);
     const snapshot = await get(incomeRef);
     
     if (!snapshot.exists()) {
       throw new Error('Receita não encontrada');
     }
     
-    const income = snapshot.val() as Income;
+    const income = snapshot.val() as Transaction;
     
     // Reverter o efeito no saldo do usuário
-    await updateUserBalance(userId, -income.amount);
+    const amountChange = income.type === 'income' ? -income.amount : income.amount;
+    await updateUserBalance(userId, amountChange);
     
     // Excluir a receita
     await remove(incomeRef);
   } catch (error) {
     console.error('Erro ao excluir receita:', error);
     throw error;
+  }
+}
+
+// Função para limpar o cache
+export function clearTransactionsCache(userId?: string) {
+  if (userId) {
+    delete transactionsCache[userId];
+  } else {
+    transactionsCache = {};
   }
 }

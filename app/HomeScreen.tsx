@@ -14,7 +14,7 @@ import TransactionList from '../components/TransactionList';
 import IncomeModal from '../components/IncomeModal';
 import ExpenseModal from '../components/ExpenseModal';
 import DeleteConfirmationModal from '../components/DeleteConfirmationModal';
-import SettingsModal from '../components/SettingsModal';
+import SettingsModal from '../components/settingsSaldo/SettingsModalImproved';
 
 // Estilos e constantes
 import { COLORS } from '../src/styles/colors';
@@ -30,27 +30,37 @@ import {
   deleteExpense, 
   deleteIncome,
   Expense,
-  Income
+  Income,
+  getTransactionsByPeriod,
+  getTransactionsByCategory,
+  getBalanceByMonth,
+  getTransactions
 } from '../services/transactionService';
 import { processarRecorrencias } from '../services/recurringService';
 import { useAuth } from '../hooks/useAuth';
-import {
-  getTransactionsByPeriod,
-  getTransactionsByCategory,
-  getTotalExpensesByMonth,
-  getTotalIncomesByMonth,
-  getBalanceByMonth
-} from '../services/transactionService';
+import { getUserBalance } from '../services/userService';
 
 // Tipos
 export interface Transaction {
-  id: string | undefined;
+  id?: string;
   type: 'income' | 'expense';
   description: string;
   amount: number;
   date: string;
   category?: string;
   source?: string;
+  paymentMethod?: string;
+  installments?: {
+    total: number;
+    current: number;
+  };
+  tags?: string[];
+  recurringId?: string;
+  goalAllocation?: string;
+  attachments?: string[];
+  notes?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface CategoryItem {
@@ -106,6 +116,7 @@ const HomeScreen = () => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<'all' | 'income' | 'expense'>('all');
+  const [userBalance, setUserBalance] = useState<number>(0);
   
   // Estados para modais
   const [incomeModalVisible, setIncomeModalVisible] = useState<boolean>(false);
@@ -118,10 +129,23 @@ const HomeScreen = () => {
   const [periodStart, setPeriodStart] = useState<Date | null>(null);
   const [periodEnd, setPeriodEnd] = useState<Date | null>(null);
 
-  // Carregar transações
+  // Carregar transações e saldo
   useEffect(() => {
-    loadTransactions();
-  }, []);
+    console.log('HomeScreen: Iniciando carregamento de dados');
+    
+    if (user) {
+      Promise.all([
+        loadTransactions(),
+        loadUserBalance()
+      ]).then(() => {
+        console.log('HomeScreen: Dados carregados com sucesso');
+      }).catch(error => {
+        console.error('HomeScreen: Erro ao carregar dados:', error);
+      });
+    } else {
+      setIsLoading(false);
+    }
+  }, [user]);
 
   // Processar recorrências ao abrir o app
   useEffect(() => {
@@ -135,7 +159,7 @@ const HomeScreen = () => {
   // Filtrar transações quando a busca ou filtro mudar
   useEffect(() => {
     filterTransactions();
-  }, [searchQuery, activeFilter, transactions]);
+  }, [searchQuery, activeFilter, transactions, balanceView, periodStart, periodEnd]);
 
   // Função para carregar transações do banco
   const loadTransactions = async (): Promise<void> => {
@@ -143,39 +167,49 @@ const HomeScreen = () => {
     
     setIsLoading(true);
     try {
-      const expenses = await getExpenses(user.uid);
-      const incomes = await getIncomes(user.uid);
+      let transactions: Transaction[] = [];
+
+      if (balanceView === 'mes_atual') {
+        const now = new Date();
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        
+        transactions = await getTransactionsByPeriod(user.uid, startOfMonth.toISOString(), endOfMonth.toISOString());
+      } else if (balanceView === 'periodo' && periodStart && periodEnd) {
+        transactions = await getTransactionsByPeriod(user.uid, periodStart.toISOString(), periodEnd.toISOString());
+      } else {
+        // Para visualização total, pegar transações do ano atual
+        const now = new Date();
+        const startOfYear = new Date(now.getFullYear(), 0, 1);
+        const endOfYear = new Date(now.getFullYear(), 11, 31);
+        
+        transactions = await getTransactionsByPeriod(user.uid, startOfYear.toISOString(), endOfYear.toISOString());
+      }
       
-      // Formatar dados para exibição
-      const formattedExpenses: Transaction[] = expenses.map(expense => ({
-        id: expense.id,
-        type: 'expense',
-        description: expense.description,
-        amount: expense.amount,
-        date: expense.date,
-        category: expense.category
-      }));
-      
-      const formattedIncomes: Transaction[] = incomes.map(income => ({
-        id: income.id,
-        type: 'income',
-        description: income.description,
-        amount: income.amount,
-        date: income.date,
-        source: income.source
-      }));
-      
-      // Combinar e ordenar por data (mais recente primeiro)
-      const allTransactions: Transaction[] = [...formattedExpenses, ...formattedIncomes]
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-      
-      setTransactions(allTransactions);
-      setFilteredTransactions(allTransactions);
+      setTransactions(transactions);
+      setFilteredTransactions(transactions);
     } catch (error) {
-      console.error('Erro ao carregar transações:', error);
       Alert.alert('Erro', 'Não foi possível carregar suas transações.');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Função para carregar o saldo do usuário
+  const loadUserBalance = async (): Promise<void> => {
+    if (!user) {
+      console.log('loadUserBalance: Nenhum usuário autenticado');
+      return;
+    }
+
+    try {
+      console.log('loadUserBalance: Iniciando carregamento do saldo');
+      const balance = await getUserBalance(user.uid);
+      console.log('loadUserBalance: Saldo carregado:', balance);
+      setUserBalance(balance);
+    } catch (error) {
+      console.error('Erro ao carregar saldo:', error);
+      Alert.alert('Erro', 'Não foi possível carregar seu saldo.');
     }
   };
 
@@ -222,12 +256,8 @@ const HomeScreen = () => {
         date: date.toISOString()
       });
       
-      // Fechar modal
       setIncomeModalVisible(false);
-      
-      // Recarregar transações
       loadTransactions();
-      
       Alert.alert('Sucesso', 'Receita adicionada com sucesso!');
     } catch (error) {
       console.error('Erro ao salvar receita:', error);
@@ -258,12 +288,8 @@ const HomeScreen = () => {
         date: date.toISOString()
       });
       
-      // Fechar modal
       setExpenseModalVisible(false);
-      
-      // Recarregar transações
       loadTransactions();
-      
       Alert.alert('Sucesso', 'Despesa adicionada com sucesso!');
     } catch (error) {
       console.error('Erro ao salvar despesa:', error);
@@ -362,7 +388,7 @@ const HomeScreen = () => {
 
       {/* Cartão de Saldo */}
       <BalanceCard 
-        balance={balance}
+        balance={userBalance}
         totalIncome={totalIncome}
         totalExpense={totalExpense}
         formatCurrency={formatCurrency}
@@ -496,12 +522,21 @@ const HomeScreen = () => {
         visible={settingsVisible}
         onClose={() => setSettingsVisible(false)}
         balanceView={balanceView}
-        onChangeBalanceView={setBalanceView}
+        onChangeBalanceView={(view) => {
+          setBalanceView(view);
+          if (view === 'mes_atual') {
+            setPeriodStart(null);
+            setPeriodEnd(null);
+          }
+        }}
         periodStart={periodStart}
         periodEnd={periodEnd}
         onChangePeriod={(start, end) => {
           setPeriodStart(start);
           setPeriodEnd(end);
+          if (start && end) {
+            setBalanceView('periodo');
+          }
         }}
       />
     </View>

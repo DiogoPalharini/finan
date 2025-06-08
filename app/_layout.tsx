@@ -7,15 +7,17 @@ import type { User } from 'firebase/auth';
 import { COLORS } from '../src/styles/colors';
 import { LAYOUT } from '../src/styles/layout';
 import { AuthProvider } from '../contexts/AuthContext';
+import { DrawerProvider, useDrawer } from '../contexts/DrawerContext';
 import DrawerContent from '../components/Menu/DrawerContent';
+import MenuButton from '../components/Menu/MenuButton';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-export default function RootLayout() {
+function RootLayoutContent() {
   const router = useRouter();
   const segments = useSegments();
+  const { isOpen, openDrawer, closeDrawer } = useDrawer();
   const [user, setUser] = React.useState(auth.currentUser as User | null);
-  const [drawerVisible, setDrawerVisible] = React.useState(false);
   const [drawerAnimation] = React.useState(new Animated.Value(0));
   const [currentRoute, setCurrentRoute] = React.useState('/');
 
@@ -48,26 +50,24 @@ export default function RootLayout() {
     }
   }, [segments]);
 
-  const isAuthScreen = ['LoginScreen', 'SignUpScreen'].includes(segments[0] || '');
+  // Monitorar mudanças no estado do drawer
+  useEffect(() => {
+    if (isOpen) {
+      Animated.timing(drawerAnimation, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+    } else {
+      Animated.timing(drawerAnimation, {
+        toValue: 0,
+        duration: 250,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [isOpen]);
 
-  const openDrawer = () => {
-    setDrawerVisible(true);
-    Animated.timing(drawerAnimation, {
-      toValue: 1,
-      duration: 300,
-      useNativeDriver: true,
-    }).start();
-  };
-  
-  const closeDrawer = () => {
-    Animated.timing(drawerAnimation, {
-      toValue: 0,
-      duration: 250,
-      useNativeDriver: true,
-    }).start(() => {
-      setDrawerVisible(false);
-    });
-  };
+  const isAuthScreen = ['LoginScreen', 'SignUpScreen'].includes(segments[0] || '');
   
   const navigateTo = (path: string) => {
     closeDrawer();
@@ -86,18 +86,17 @@ export default function RootLayout() {
     }
   };
 
-  const renderHeader = () => (
-    <Appbar.Header style={styles.appbar}>
-      <Appbar.Content title="" />
-      <Appbar.Action
-        icon="menu"
-        color={COLORS.secondary}
-        size={28}
-        onPress={openDrawer}
-        style={styles.menuButton}
-      />
-    </Appbar.Header>
-  );
+  const renderHeader = () => {
+    const isHomeScreen = segments[0] === 'HomeScreen';
+    return (
+      <View style={styles.headerContainer}>
+        <MenuButton 
+          onPress={openDrawer} 
+          color={isHomeScreen ? COLORS.secondary : COLORS.white}
+        />
+      </View>
+    );
+  };
 
   // Animação do backdrop
   const backdropOpacity = drawerAnimation.interpolate({
@@ -116,7 +115,7 @@ export default function RootLayout() {
       <PaperProvider>
         <Portal>
           <Modal
-            visible={drawerVisible}
+            visible={isOpen}
             onDismiss={closeDrawer}
             contentContainerStyle={styles.modalContainer}
             dismissable={true}
@@ -126,7 +125,7 @@ export default function RootLayout() {
                 styles.backdrop,
                 { opacity: backdropOpacity }
               ]}
-              pointerEvents={drawerVisible ? 'auto' : 'none'}
+              pointerEvents={isOpen ? 'auto' : 'none'}
               onTouchStart={closeDrawer}
             />
             <Animated.View
@@ -162,15 +161,17 @@ export default function RootLayout() {
   );
 }
 
+export default function RootLayout() {
+  return (
+    <DrawerProvider>
+      <RootLayoutContent />
+    </DrawerProvider>
+  );
+}
+
 const styles = StyleSheet.create({
-  appbar: {
-    backgroundColor: COLORS.background, 
-    elevation: 0, 
-    justifyContent: 'space-between'
-  },
-  menuButton: {
-    borderRadius: 12,
-    marginRight: 8,
+  headerContainer: {
+    position: 'relative',
   },
   modalContainer: {
     margin: 0,

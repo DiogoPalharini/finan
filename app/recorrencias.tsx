@@ -22,15 +22,21 @@ import { useAuth } from '../hooks/useAuth';
 import { getRecorrencias, deleteRecorrencia, Recorrencia } from '../services/recurringService';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import MenuButton from '../components/Menu/MenuButton';
+import { useDrawerNavigation } from '../hooks/useDrawerNavigation';
+import RecurringFormModal from '../components/Recurring/RecurringFormModal';
 
 const { width } = Dimensions.get('window');
 
 const RecurringScreen = () => {
   const { user } = useAuth();
+  const { openDrawer } = useDrawerNavigation();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [recorrencias, setRecorrencias] = useState<Recorrencia[]>([]);
   const [filter, setFilter] = useState<'todos' | 'despesa' | 'receita'>('todos');
+  const [isFormModalVisible, setIsFormModalVisible] = useState(false);
+  const [selectedRecorrenciaId, setSelectedRecorrenciaId] = useState<string | undefined>();
 
   const loadRecorrencias = useCallback(async (isRefresh = false) => {
     if (!user) return;
@@ -80,11 +86,18 @@ const RecurringScreen = () => {
     );
   };
 
-  const handleEdit = (recorrencia: Recorrencia) => {
-    router.push({
-      pathname: '/recorrencia-form',
-      params: { id: recorrencia.id }
-    });
+  const handleAddRecorrencia = () => {
+    setSelectedRecorrenciaId(undefined);
+    setIsFormModalVisible(true);
+  };
+
+  const handleEditRecorrencia = (id: string) => {
+    setSelectedRecorrenciaId(id);
+    setIsFormModalVisible(true);
+  };
+
+  const handleFormSuccess = () => {
+    loadRecorrencias();
   };
 
   const filteredRecorrencias = recorrencias.filter(rec => 
@@ -129,7 +142,7 @@ const RecurringScreen = () => {
       </Text>
       <TouchableOpacity 
         style={styles.emptyButton}
-        onPress={() => router.push('/recorrencia-form')}
+        onPress={handleAddRecorrencia}
       >
         <LinearGradient
           colors={[COLORS.primary, COLORS.secondary]}
@@ -164,48 +177,127 @@ const RecurringScreen = () => {
         end={{ x: 1, y: 1 }}
         style={styles.header}
       >
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={() => router.back()}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="arrow-back" size={22} color={COLORS.white} />
+        </TouchableOpacity>
+
+        <MenuButton onPress={openDrawer} color={COLORS.white} />
+        
         <View style={styles.headerContent}>
-          <View style={styles.headerInfo}>
             <Text style={styles.headerTitle}>Recorrências</Text>
             <Text style={styles.headerSubtitle}>
-              {stats.ativas} ativas • {stats.total} total
+            Gerencie suas transações recorrentes
             </Text>
-          </View>
-          
-          <TouchableOpacity 
-            style={styles.addButton}
-            onPress={() => router.push('/recorrencia-form')}
-          >
-            <View style={styles.addButtonContent}>
-              <Ionicons name="add" size={24} color={COLORS.white} />
-            </View>
-          </TouchableOpacity>
-        </View>
-
-        {/* Resumo financeiro */}
-        <View style={styles.summaryContainer}>
-          <View style={styles.summaryCard}>
-            <View style={styles.summaryItem}>
-              <Ionicons name="trending-up" size={16} color={COLORS.success} />
-              <Text style={styles.summaryLabel}>Receitas</Text>
-              <Text style={[styles.summaryValue, { color: COLORS.success }]}>
-                R$ {stats.valorTotalReceitas.toFixed(2)}
-              </Text>
-            </View>
-            
-            <View style={styles.summaryDivider} />
-            
-            <View style={styles.summaryItem}>
-              <Ionicons name="trending-down" size={16} color={COLORS.danger} />
-              <Text style={styles.summaryLabel}>Despesas</Text>
-              <Text style={[styles.summaryValue, { color: COLORS.danger }]}>
-                R$ {stats.valorTotalDespesas.toFixed(2)}
-              </Text>
-            </View>
-          </View>
         </View>
       </LinearGradient>
 
+        {/* Resumo financeiro */}
+      <View style={styles.statsContainer}>
+        <View style={styles.statCard}>
+          <View style={[styles.statIconContainer, { backgroundColor: `${COLORS.success}20` }]}>
+            <Ionicons name="trending-up" size={20} color={COLORS.success} />
+          </View>
+          <Text style={styles.statValue}>
+                R$ {stats.valorTotalReceitas.toFixed(2)}
+              </Text>
+          <Text style={styles.statLabel}>Receitas</Text>
+            </View>
+            
+        <View style={styles.statDivider} />
+        
+        <View style={styles.statCard}>
+          <View style={[styles.statIconContainer, { backgroundColor: `${COLORS.danger}20` }]}>
+            <Ionicons name="trending-down" size={20} color={COLORS.danger} />
+          </View>
+          <Text style={styles.statValue}>
+                R$ {stats.valorTotalDespesas.toFixed(2)}
+              </Text>
+          <Text style={styles.statLabel}>Despesas</Text>
+            </View>
+        
+        <View style={styles.statDivider} />
+        
+        <View style={styles.statCard}>
+          <View style={[styles.statIconContainer, { backgroundColor: `${COLORS.primary}20` }]}>
+            <Ionicons name="repeat" size={20} color={COLORS.primary} />
+          </View>
+          <Text style={styles.statValue}>{stats.ativas}</Text>
+          <Text style={styles.statLabel}>Ativas</Text>
+        </View>
+      </View>
+
+      {/* Filtros */}
+      <View style={styles.filtersContainer}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <TouchableOpacity
+              style={[
+              styles.filterButton,
+              filter === 'todos' && styles.activeFilterButton
+              ]}
+              onPress={() => setFilter('todos')}
+            >
+              <Ionicons 
+                name="apps" 
+                size={16} 
+                color={filter === 'todos' ? COLORS.white : COLORS.primary} 
+              />
+              <Text style={[
+              styles.filterText,
+              filter === 'todos' && styles.activeFilterText
+              ]}>
+                Todos ({stats.total})
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+              styles.filterButton,
+              filter === 'receita' && styles.activeFilterButton,
+                filter === 'receita' && { backgroundColor: COLORS.success }
+              ]}
+              onPress={() => setFilter('receita')}
+            >
+              <Ionicons 
+                name="trending-up" 
+                size={16} 
+                color={filter === 'receita' ? COLORS.white : COLORS.success} 
+              />
+              <Text style={[
+              styles.filterText,
+              filter === 'receita' && styles.activeFilterText
+              ]}>
+                Receitas ({stats.receitas})
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+              styles.filterButton,
+              filter === 'despesa' && styles.activeFilterButton,
+                filter === 'despesa' && { backgroundColor: COLORS.danger }
+              ]}
+              onPress={() => setFilter('despesa')}
+            >
+              <Ionicons 
+                name="trending-down" 
+                size={16} 
+                color={filter === 'despesa' ? COLORS.white : COLORS.danger} 
+              />
+              <Text style={[
+              styles.filterText,
+              filter === 'despesa' && styles.activeFilterText
+              ]}>
+                Despesas ({stats.despesas})
+              </Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </View>
+
+        {/* Lista de recorrências */}
       <ScrollView 
         style={styles.content}
         showsVerticalScrollIndicator={false}
@@ -218,192 +310,89 @@ const RecurringScreen = () => {
           />
         }
       >
-        {/* Filtros melhorados */}
-        <View style={styles.filterContainer}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <TouchableOpacity
-              style={[
-                styles.filterChip,
-                filter === 'todos' && styles.filterChipActive
-              ]}
-              onPress={() => setFilter('todos')}
-            >
-              <Ionicons 
-                name="apps" 
-                size={16} 
-                color={filter === 'todos' ? COLORS.white : COLORS.primary} 
-              />
-              <Text style={[
-                styles.filterChipText,
-                filter === 'todos' && styles.filterChipTextActive
-              ]}>
-                Todos ({stats.total})
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.filterChip,
-                filter === 'receita' && styles.filterChipActive,
-                filter === 'receita' && { backgroundColor: COLORS.success }
-              ]}
-              onPress={() => setFilter('receita')}
-            >
-              <Ionicons 
-                name="trending-up" 
-                size={16} 
-                color={filter === 'receita' ? COLORS.white : COLORS.success} 
-              />
-              <Text style={[
-                styles.filterChipText,
-                { color: filter === 'receita' ? COLORS.white : COLORS.success }
-              ]}>
-                Receitas ({stats.receitas})
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.filterChip,
-                filter === 'despesa' && styles.filterChipActive,
-                filter === 'despesa' && { backgroundColor: COLORS.danger }
-              ]}
-              onPress={() => setFilter('despesa')}
-            >
-              <Ionicons 
-                name="trending-down" 
-                size={16} 
-                color={filter === 'despesa' ? COLORS.white : COLORS.danger} 
-              />
-              <Text style={[
-                styles.filterChipText,
-                { color: filter === 'despesa' ? COLORS.white : COLORS.danger }
-              ]}>
-                Despesas ({stats.despesas})
-              </Text>
-            </TouchableOpacity>
-          </ScrollView>
-        </View>
-
-        {/* Lista de recorrências */}
-        <View style={styles.listContainer}>
           {filteredRecorrencias.length === 0 ? (
             renderEmptyState()
           ) : (
-            filteredRecorrencias.map((recorrencia) => (
-              <View key={recorrencia.id} style={styles.recorrenciaCard}>
-                <LinearGradient
-                  colors={[
-                    recorrencia.tipo === 'receita' ? COLORS.success + '08' : COLORS.danger + '08',
-                    COLORS.surface
-                  ]}
-                  style={styles.cardGradient}
-                >
-                  {/* Header do card */}
-                  <View style={styles.cardHeader}>
-                    <View style={styles.cardMainInfo}>
-                      <View style={[
-                        styles.cardIcon,
-                        { backgroundColor: recorrencia.tipo === 'receita' ? COLORS.success + '20' : COLORS.danger + '20' }
-                      ]}>
-                        <Ionicons 
-                          name={recorrencia.tipo === 'receita' ? 'trending-up' : 'trending-down'} 
-                          size={20} 
-                          color={recorrencia.tipo === 'receita' ? COLORS.success : COLORS.danger} 
-                        />
-                      </View>
-                      
-                      <View style={styles.cardInfo}>
-                        <Text style={styles.cardTitle}>{recorrencia.descricao}</Text>
-                        <Text style={styles.cardSubtitle}>
-                          Todo dia {recorrencia.diaRecorrencia}
-                        </Text>
-                      </View>
-                    </View>
-
-                    <View style={styles.cardActions}>
+          <View style={styles.listContainer}>
+            {filteredRecorrencias.map((recorrencia) => (
                       <TouchableOpacity 
-                        style={[styles.actionButton, { backgroundColor: COLORS.primary + '15' }]}
-                        onPress={() => handleEdit(recorrencia)}
+                key={recorrencia.id}
+                style={styles.recorrenciaCard}
+                        onPress={() => handleEditRecorrencia(recorrencia.id)}
                       >
-                        <Ionicons name="pencil" size={16} color={COLORS.primary} />
-                      </TouchableOpacity>
-                      <TouchableOpacity 
-                        style={[styles.actionButton, { backgroundColor: COLORS.danger + '15' }]}
-                        onPress={() => handleDelete(recorrencia.id!)}
-                      >
-                        <Ionicons name="trash" size={16} color={COLORS.danger} />
-                      </TouchableOpacity>
-                    </View>
+                <View style={styles.recorrenciaInfo}>
+                  <View style={styles.recorrenciaHeader}>
+                    <Text style={styles.recorrenciaTitle}>{recorrencia.descricao}</Text>
+                    <Chip
+                      mode="flat"
+                      style={[
+                        styles.statusChip,
+                        recorrencia.status === 'ativo' 
+                          ? styles.statusChipActive 
+                          : styles.statusChipInactive
+                      ]}
+                    >
+                      {recorrencia.status === 'ativo' ? 'Ativo' : 'Inativo'}
+                    </Chip>
                   </View>
 
-                  {/* Valor */}
-                  <View style={styles.cardValue}>
+                  <View style={styles.recorrenciaDetails}>
+                    <View style={styles.recorrenciaDetail}>
+                      <Ionicons 
+                        name={recorrencia.tipo === 'receita' ? 'trending-up' : 'trending-down'} 
+                        size={16} 
+                        color={recorrencia.tipo === 'receita' ? COLORS.success : COLORS.danger} 
+                      />
                     <Text style={[
-                      styles.valueText,
+                        styles.recorrenciaValue,
                       { color: recorrencia.tipo === 'receita' ? COLORS.success : COLORS.danger }
                     ]}>
-                      {recorrencia.tipo === 'receita' ? '+' : '-'} R$ {recorrencia.valor.toFixed(2)}
+                        R$ {recorrencia.valor.toFixed(2)}
                     </Text>
                   </View>
-
-                  {/* Detalhes */}
-                  <View style={styles.cardDetails}>
-                    {recorrencia.categoria && (
-                      <View style={styles.categoryChip}>
-                        <Ionicons name="folder-outline" size={12} color={COLORS.textSecondary} />
-                        <Text style={styles.categoryText}>{recorrencia.categoria}</Text>
-                      </View>
-                    )}
                     
-                    <View style={[
-                      styles.statusChip,
-                      { 
-                        backgroundColor: 
-                          recorrencia.status === 'ativo' ? COLORS.success + '20' :
-                          recorrencia.status === 'pausado' ? COLORS.warning + '20' :
-                          COLORS.textSecondary + '20'
-                      }
-                    ]}>
-                      <View style={[
-                        styles.statusDot,
-                        { 
-                          backgroundColor: 
-                            recorrencia.status === 'ativo' ? COLORS.success :
-                            recorrencia.status === 'pausado' ? COLORS.warning :
-                            COLORS.textSecondary
-                        }
-                      ]} />
-                      <Text style={[
-                        styles.statusText,
-                        { 
-                          color: 
-                            recorrencia.status === 'ativo' ? COLORS.success :
-                            recorrencia.status === 'pausado' ? COLORS.warning :
-                            COLORS.textSecondary
-                        }
-                      ]}>
-                        {recorrencia.status === 'ativo' ? 'Ativo' :
-                         recorrencia.status === 'pausado' ? 'Pausado' : 'Concluído'}
+                    <View style={styles.recorrenciaDetail}>
+                      <Ionicons name="calendar" size={16} color={COLORS.textSecondary} />
+                      <Text style={styles.recorrenciaDate}>
+                        {format(new Date(recorrencia.dataInicio), "dd 'de' MMMM", { locale: ptBR })}
                       </Text>
                     </View>
                   </View>
-
-                  {/* Footer */}
-                  <View style={styles.cardFooter}>
-                    <Text style={styles.dateText}>
-                      Início: {format(new Date(recorrencia.dataInicio), 'dd/MM/yyyy', { locale: ptBR })}
-                    </Text>
-                  </View>
-                </LinearGradient>
-              </View>
-            ))
-          )}
         </View>
 
-        {/* Espaço extra */}
-        <View style={{ height: 100 }} />
+                <TouchableOpacity
+                  style={styles.deleteButton}
+                  onPress={() => handleDelete(recorrencia.id)}
+                >
+                  <Ionicons name="trash-outline" size={20} color={COLORS.danger} />
+                </TouchableOpacity>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
       </ScrollView>
+
+      {/* Botão de adicionar */}
+      <TouchableOpacity
+        style={styles.addButton}
+        onPress={handleAddRecorrencia}
+        activeOpacity={0.8}
+      >
+        <LinearGradient
+          colors={[COLORS.primary, COLORS.secondary]}
+          style={styles.addButtonGradient}
+        >
+          <Ionicons name="add" size={24} color={COLORS.white} />
+        </LinearGradient>
+      </TouchableOpacity>
+
+      {/* Modal do formulário */}
+      <RecurringFormModal
+        visible={isFormModalVisible}
+        onClose={() => setIsFormModalVisible(false)}
+        recorrenciaId={selectedRecorrenciaId}
+        onSuccess={handleFormSuccess}
+      />
     </SafeAreaView>
   );
 };
@@ -413,254 +402,242 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
   },
-  loadingContainer: {
-    flex: 1,
+  header: {
+    paddingTop: 60,
+    paddingBottom: 30,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  backButton: {
+    position: 'absolute',
+    top: 16,
+    left: 16,
+    zIndex: 10,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  loadingText: {
-    marginTop: LAYOUT.spacing.md,
-    fontSize: TYPO.size.sm,
-    fontFamily: TYPO.family.regular,
-    color: COLORS.textSecondary,
-  },
-  header: {
-    paddingTop: LAYOUT.spacing.xl,
-    paddingBottom: LAYOUT.spacing.lg,
-    paddingHorizontal: LAYOUT.spacing.lg,
-  },
   headerContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: LAYOUT.spacing.md,
-  },
-  headerInfo: {
-    flex: 1,
+    paddingHorizontal: LAYOUT.spacing.lg,
   },
   headerTitle: {
     fontSize: TYPO.size.xl,
     fontFamily: TYPO.family.bold,
     color: COLORS.white,
-    marginBottom: 4,
+    marginBottom: LAYOUT.spacing.xs,
   },
   headerSubtitle: {
     fontSize: TYPO.size.sm,
     fontFamily: TYPO.family.regular,
-    color: COLORS.white + 'CC',
+    color: 'rgba(255, 255, 255, 0.8)',
+    textAlign: 'center',
   },
-  addButton: {
-    borderRadius: 24,
-    overflow: 'hidden',
-  },
-  addButtonContent: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  summaryContainer: {
-    marginTop: LAYOUT.spacing.sm,
-  },
-  summaryCard: {
+  statsContainer: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    borderRadius: 16,
-    padding: LAYOUT.spacing.md,
-    backdropFilter: 'blur(10px)',
-  },
-  summaryItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  summaryLabel: {
-    fontSize: TYPO.size.xs,
-    fontFamily: TYPO.family.regular,
-    color: COLORS.white + 'CC',
-    marginTop: 4,
-    marginBottom: 2,
-  },
-  summaryValue: {
-    fontSize: TYPO.size.sm,
-    fontFamily: TYPO.family.bold,
-  },
-  summaryDivider: {
-    width: 1,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    marginHorizontal: LAYOUT.spacing.md,
-  },
-  content: {
-    flex: 1,
-  },
-  filterContainer: {
-    paddingHorizontal: LAYOUT.spacing.lg,
-    paddingVertical: LAYOUT.spacing.md,
-  },
-  filterChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: LAYOUT.spacing.md,
-    paddingVertical: LAYOUT.spacing.sm,
-    borderRadius: 20,
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     backgroundColor: COLORS.surface,
-    marginRight: LAYOUT.spacing.sm,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    borderRadius: 12,
+    marginHorizontal: 16,
+    marginBottom: 16,
     borderWidth: 1,
     borderColor: COLORS.border,
   },
-  filterChipActive: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
-  },
-  filterChipText: {
-    fontSize: TYPO.size.sm,
-    fontFamily: TYPO.family.medium,
-    color: COLORS.primary,
-    marginLeft: 6,
-  },
-  filterChipTextActive: {
-    color: COLORS.white,
-  },
-  listContainer: {
-    paddingHorizontal: LAYOUT.spacing.lg,
-  },
-  recorrenciaCard: {
-    marginBottom: LAYOUT.spacing.md,
-    borderRadius: 20,
-    overflow: 'hidden',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-  },
-  cardGradient: {
-    padding: LAYOUT.spacing.lg,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: LAYOUT.spacing.md,
-  },
-  cardMainInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  statCard: {
     flex: 1,
+    alignItems: 'center',
   },
-  cardIcon: {
+  statIconContainer: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    justifyContent: 'center',
     alignItems: 'center',
-    marginRight: LAYOUT.spacing.sm,
+    justifyContent: 'center',
+    marginBottom: 8,
   },
-  cardInfo: {
-    flex: 1,
-  },
-  cardTitle: {
-    fontSize: TYPO.size.md,
-    fontFamily: TYPO.family.semibold,
+  statValue: {
+    fontSize: 16,
+    fontWeight: '700',
     color: COLORS.text,
-    marginBottom: 2,
+    marginBottom: 4,
   },
-  cardSubtitle: {
-    fontSize: TYPO.size.xs,
-    fontFamily: TYPO.family.regular,
+  statLabel: {
+    fontSize: 12,
     color: COLORS.textSecondary,
   },
-  cardActions: {
-    flexDirection: 'row',
-    gap: LAYOUT.spacing.xs,
+  statDivider: {
+    width: 1,
+    height: '100%',
+    backgroundColor: COLORS.border,
+    marginHorizontal: 8,
   },
-  actionButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
+  filtersContainer: {
+    paddingHorizontal: 16,
+    marginBottom: 16,
   },
-  cardValue: {
-    marginBottom: LAYOUT.spacing.md,
-  },
-  valueText: {
-    fontSize: TYPO.size.xl,
-    fontFamily: TYPO.family.bold,
-  },
-  cardDetails: {
+  filterButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: LAYOUT.spacing.sm,
-    marginBottom: LAYOUT.spacing.md,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginRight: 8,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
-  categoryChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.background,
-    paddingHorizontal: LAYOUT.spacing.sm,
-    paddingVertical: 4,
-    borderRadius: 12,
+  activeFilterButton: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
   },
-  categoryText: {
-    fontSize: TYPO.size.xs,
-    fontFamily: TYPO.family.regular,
+  filterText: {
+    fontSize: 14,
+    fontWeight: '600',
     color: COLORS.textSecondary,
     marginLeft: 4,
   },
-  statusChip: {
+  activeFilterText: {
+    color: COLORS.white,
+  },
+  content: {
+    flex: 1,
+    paddingHorizontal: 16,
+  },
+  listContainer: {
+    paddingBottom: 80,
+  },
+  recorrenciaCard: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: LAYOUT.spacing.sm,
-    paddingVertical: 4,
-    borderRadius: 12,
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
-  statusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    marginRight: 6,
+  recorrenciaInfo: {
+    flex: 1,
+    marginRight: 12,
   },
-  statusText: {
-    fontSize: TYPO.size.xs,
-    fontFamily: TYPO.family.medium,
+  recorrenciaHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+    flexWrap: 'wrap',
+    gap: 8,
   },
-  cardFooter: {
-    borderTopWidth: 1,
-    borderTopColor: COLORS.divider,
-    paddingTop: LAYOUT.spacing.sm,
+  recorrenciaTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.text,
+    flex: 1,
+    marginRight: 8,
   },
-  dateText: {
-    fontSize: TYPO.size.xs,
-    fontFamily: TYPO.family.regular,
+  statusChip: {
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    paddingHorizontal: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    minWidth: 100,
+    alignSelf: 'flex-start',
+  },
+  statusChipActive: {
+    backgroundColor: COLORS.success + '20',
+    borderColor: COLORS.success,
+  },
+  statusChipInactive: {
+    backgroundColor: COLORS.danger + '20',
+    borderColor: COLORS.danger,
+  },
+  recorrenciaDetails: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  recorrenciaDetail: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  recorrenciaValue: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  recorrenciaDate: {
+    fontSize: 14,
     color: COLORS.textSecondary,
+  },
+  deleteButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: COLORS.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  addButton: {
+    position: 'absolute',
+    right: LAYOUT.spacing.lg,
+    bottom: LAYOUT.spacing.lg,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    overflow: 'hidden',
+  },
+  addButtonGradient: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   emptyState: {
     alignItems: 'center',
-    paddingVertical: LAYOUT.spacing.xl * 2,
+    justifyContent: 'center',
+    paddingVertical: LAYOUT.spacing.xl,
   },
   emptyIconContainer: {
-    marginBottom: LAYOUT.spacing.lg,
-  },
-  emptyIconGradient: {
     width: 120,
     height: 120,
     borderRadius: 60,
+    marginBottom: LAYOUT.spacing.lg,
+    overflow: 'hidden',
+  },
+  emptyIconGradient: {
+    width: '100%',
+    height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
   },
   emptyTitle: {
     fontSize: TYPO.size.lg,
-    fontFamily: TYPO.family.semibold,
+    fontFamily: TYPO.family.bold,
     color: COLORS.text,
     marginBottom: LAYOUT.spacing.sm,
-    textAlign: 'center',
   },
   emptySubtitle: {
     fontSize: TYPO.size.sm,
@@ -668,24 +645,37 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     textAlign: 'center',
     marginBottom: LAYOUT.spacing.lg,
-    paddingHorizontal: LAYOUT.spacing.lg,
-    lineHeight: 20,
+    paddingHorizontal: LAYOUT.spacing.xl,
   },
   emptyButton: {
-    borderRadius: 24,
+    width: '100%',
+    height: 48,
+    borderRadius: LAYOUT.radius.lg,
     overflow: 'hidden',
   },
   emptyButtonGradient: {
+    width: '100%',
+    height: '100%',
     flexDirection: 'row',
+    justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: LAYOUT.spacing.lg,
-    paddingVertical: LAYOUT.spacing.sm,
   },
   emptyButtonText: {
-    fontSize: TYPO.size.sm,
-    fontFamily: TYPO.family.semibold,
+    fontSize: TYPO.size.md,
+    fontFamily: TYPO.family.medium,
     color: COLORS.white,
-    marginLeft: 8,
+    marginLeft: LAYOUT.spacing.sm,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: LAYOUT.spacing.md,
+    fontSize: TYPO.size.md,
+    fontFamily: TYPO.family.medium,
+    color: COLORS.textSecondary,
   },
 });
 

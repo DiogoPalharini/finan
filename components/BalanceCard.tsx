@@ -1,6 +1,6 @@
 // components/BalanceCard.tsx
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Card } from 'react-native-paper';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,13 +13,15 @@ interface BalanceCardProps {
   totalIncome: number;
   totalExpense: number;
   formatCurrency: (value: number) => string;
+  onSettingsPress?: () => void;
 }
 
-const BalanceCard: React.FC<BalanceCardProps> = ({ 
-  balance, 
-  totalIncome, 
-  totalExpense, 
-  formatCurrency 
+const BalanceCard: React.FC<BalanceCardProps> = ({
+  balance,
+  totalIncome,
+  totalExpense,
+  formatCurrency,
+  onSettingsPress
 }) => {
   return (
     <Card style={styles.balanceCard}>
@@ -27,7 +29,15 @@ const BalanceCard: React.FC<BalanceCardProps> = ({
         colors={[COLORS.primary, COLORS.secondary]}
         style={styles.balanceCardGradient}
       >
-        <Text style={styles.balanceLabel}>Saldo Atual</Text>
+        <View style={styles.headerContainer}>
+          <Text style={styles.balanceLabel}>Saldo Atual</Text>
+          <TouchableOpacity 
+            onPress={onSettingsPress}
+            style={styles.settingsButton}
+          >
+            <Ionicons name="settings-outline" size={20} color={COLORS.white} />
+          </TouchableOpacity>
+        </View>
         <Text style={styles.balanceValue}>{formatCurrency(balance)}</Text>
         
         <View style={styles.balanceDetails}>
@@ -60,11 +70,19 @@ const styles = StyleSheet.create({
   balanceCardGradient: {
     padding: LAYOUT.spacing.lg,
   },
+  headerContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
   balanceLabel: {
     fontSize: TYPO.size.sm,
     fontFamily: TYPO.family.regular,
     color: COLORS.white,
     opacity: 0.8,
+  },
+  settingsButton: {
+    padding: LAYOUT.spacing.xs,
   },
   balanceValue: {
     fontSize: TYPO.size.xxl,

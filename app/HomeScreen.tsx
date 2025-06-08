@@ -129,22 +129,26 @@ const HomeScreen = () => {
   const [periodStart, setPeriodStart] = useState<Date | null>(null);
   const [periodEnd, setPeriodEnd] = useState<Date | null>(null);
 
-  // Carregar transações e saldo
+  // Carregar dados iniciais
   useEffect(() => {
-    console.log('HomeScreen: Iniciando carregamento de dados');
-    
-    if (user) {
-      Promise.all([
-        loadTransactions(),
-        loadUserBalance()
-      ]).then(() => {
+    const loadInitialData = async () => {
+      if (!user) return;
+      
+      try {
+        // Carregar saldo primeiro
+        await loadUserBalance();
+        
+        // Carregar transações iniciais
+        await loadTransactions();
+        
         console.log('HomeScreen: Dados carregados com sucesso');
-      }).catch(error => {
-        console.error('HomeScreen: Erro ao carregar dados:', error);
-      });
-    } else {
-      setIsLoading(false);
-    }
+      } catch (error) {
+        console.error('Erro ao carregar dados iniciais:', error);
+        Alert.alert('Erro', 'Não foi possível carregar seus dados.');
+      }
+    };
+
+    loadInitialData();
   }, [user]);
 
   // Processar recorrências ao abrir o app
@@ -159,7 +163,14 @@ const HomeScreen = () => {
   // Filtrar transações quando a busca ou filtro mudar
   useEffect(() => {
     filterTransactions();
-  }, [searchQuery, activeFilter, transactions, balanceView, periodStart, periodEnd]);
+  }, [searchQuery, activeFilter, transactions]);
+
+  // Carregar transações quando mudar a visualização
+  useEffect(() => {
+    if (user) {
+      loadTransactions();
+    }
+  }, [balanceView, periodStart, periodEnd]);
 
   // Função para carregar transações do banco
   const loadTransactions = async (): Promise<void> => {
@@ -168,27 +179,62 @@ const HomeScreen = () => {
     setIsLoading(true);
     try {
       let transactions: Transaction[] = [];
-
+      
       if (balanceView === 'mes_atual') {
+        // Para mês atual, usar getTransactionsByPeriod com as datas do mês atual
         const now = new Date();
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
         const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        endOfMonth.setHours(23, 59, 59, 999);
         
-        transactions = await getTransactionsByPeriod(user.uid, startOfMonth.toISOString(), endOfMonth.toISOString());
+        transactions = await getTransactionsByPeriod(
+          user.uid,
+          startOfMonth.toISOString(),
+          endOfMonth.toISOString()
+        );
       } else if (balanceView === 'periodo' && periodStart && periodEnd) {
-        transactions = await getTransactionsByPeriod(user.uid, periodStart.toISOString(), periodEnd.toISOString());
-      } else {
-        // Para visualização total, pegar transações do ano atual
-        const now = new Date();
-        const startOfYear = new Date(now.getFullYear(), 0, 1);
-        const endOfYear = new Date(now.getFullYear(), 11, 31);
+        // Para período personalizado, usar getTransactionsByPeriod com as datas selecionadas
+        const start = new Date(periodStart);
+        const end = new Date(periodEnd);
+        end.setHours(23, 59, 59, 999);
         
-        transactions = await getTransactionsByPeriod(user.uid, startOfYear.toISOString(), endOfYear.toISOString());
+        transactions = await getTransactionsByPeriod(
+          user.uid,
+          start.toISOString(),
+          end.toISOString()
+        );
+      } else if (balanceView === 'total') {
+        // Para total acumulado, usar getTransactions para pegar todas as transações
+        transactions = await getTransactions(user.uid);
       }
+
+      // Ordenar transações por data (mais recente primeiro)
+      transactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       
+      // Atualizar estados com as transações
       setTransactions(transactions);
       setFilteredTransactions(transactions);
+      
+      // Calcular totais para o período
+      const totalIncome = transactions
+        .filter(t => t.type === 'income')
+        .reduce((sum, t) => sum + t.amount, 0);
+        
+      const totalExpense = transactions
+        .filter(t => t.type === 'expense')
+        .reduce((sum, t) => sum + t.amount, 0);
+        
+      // Atualizar o saldo
+      setUserBalance(totalIncome - totalExpense);
+      
+      console.log('Visualização:', balanceView);
+      console.log('Total de transações:', transactions.length);
+      console.log('Receitas:', totalIncome);
+      console.log('Despesas:', totalExpense);
+      console.log('Saldo:', totalIncome - totalExpense);
+      
     } catch (error) {
+      console.error('Erro ao carregar transações:', error);
       Alert.alert('Erro', 'Não foi possível carregar suas transações.');
     } finally {
       setIsLoading(false);
@@ -346,25 +392,10 @@ const HomeScreen = () => {
     });
   };
 
-  // Filtro de saldo (apenas lógica base, ajuste conforme necessário)
+  // Usar as transações filtradas para exibição
   let displayedTransactions = filteredTransactions;
-  if (balanceView === 'mes_atual') {
-    const now = new Date();
-    displayedTransactions = filteredTransactions.filter(t => {
-      const d = new Date(t.date);
-      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-    });
-  } else if (balanceView === 'periodo' && periodStart) {
-    displayedTransactions = filteredTransactions.filter(t => {
-      const d = new Date(t.date);
-      const start = periodStart;
-      const end = periodEnd || new Date();
-      end.setHours(23, 59, 59, 999); // Incluir todo o último dia
-      return d >= start && d <= end;
-    });
-  }
 
-  // Calcular totais baseado nas transações filtradas
+  // Calcular totais para exibição (apenas para os itens filtrados)
   const totalIncome = displayedTransactions
     .filter(t => t.type === 'income')
     .reduce((sum, t) => sum + t.amount, 0);
@@ -372,18 +403,30 @@ const HomeScreen = () => {
   const totalExpense = displayedTransactions
     .filter(t => t.type === 'expense')
     .reduce((sum, t) => sum + t.amount, 0);
-    
-  const balance = totalIncome - totalExpense;
+
+  // Atualizar quando mudar a visualização
+  const handleChangeBalanceView = (view: BalanceViewType) => {
+    setBalanceView(view);
+    if (view === 'mes_atual') {
+      setPeriodStart(null);
+      setPeriodEnd(null);
+    }
+  };
+
+  // Atualizar quando mudar o período
+  const handleChangePeriod = (start: Date | null, end: Date | null) => {
+    setPeriodStart(start);
+    setPeriodEnd(end);
+    if (start && end) {
+      setBalanceView('periodo');
+    }
+  };
 
   return (
     <View style={styles.container}>
       {/* Cabeçalho */}
       <View style={styles.header}>
         <Title style={styles.headerTitle}>Olá, {user?.displayName || 'Usuário'}</Title>
-        
-        <TouchableOpacity style={styles.settingsButton} onPress={() => setSettingsVisible(true)}>
-          <Ionicons name="settings-outline" size={24} color={COLORS.text} />
-        </TouchableOpacity>
       </View>
 
       {/* Cartão de Saldo */}
@@ -392,6 +435,7 @@ const HomeScreen = () => {
         totalIncome={totalIncome}
         totalExpense={totalExpense}
         formatCurrency={formatCurrency}
+        onSettingsPress={() => setSettingsVisible(true)}
       />
 
       {/* Barra de Busca */}
@@ -522,22 +566,10 @@ const HomeScreen = () => {
         visible={settingsVisible}
         onClose={() => setSettingsVisible(false)}
         balanceView={balanceView}
-        onChangeBalanceView={(view) => {
-          setBalanceView(view);
-          if (view === 'mes_atual') {
-            setPeriodStart(null);
-            setPeriodEnd(null);
-          }
-        }}
+        onChangeBalanceView={handleChangeBalanceView}
         periodStart={periodStart}
         periodEnd={periodEnd}
-        onChangePeriod={(start, end) => {
-          setPeriodStart(start);
-          setPeriodEnd(end);
-          if (start && end) {
-            setBalanceView('periodo');
-          }
-        }}
+        onChangePeriod={handleChangePeriod}
       />
     </View>
   );
@@ -560,9 +592,6 @@ const styles = StyleSheet.create({
     fontSize: TYPO.size.xl,
     fontFamily: TYPO.family.bold,
     color: COLORS.text,
-  },
-  settingsButton: {
-    padding: LAYOUT.spacing.xs,
   },
   searchBar: {
     marginBottom: LAYOUT.spacing.md,

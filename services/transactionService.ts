@@ -62,6 +62,9 @@ const CACHE_DURATION = 30000; // 30 segundos
  */
 export async function saveTransaction(userId: string, transaction: Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
   try {
+    console.log('saveTransaction: Iniciando salvamento de transação');
+    console.log('saveTransaction: Dados da transação:', JSON.stringify(transaction, null, 2));
+    
     const transactionsRef = ref(rtdb, `users/${userId}/transactions`);
     const newTransactionRef = push(transactionsRef);
     const transactionId = newTransactionRef.key as string;
@@ -74,6 +77,8 @@ export async function saveTransaction(userId: string, transaction: Omit<Transact
       updatedAt: now
     };
     
+    console.log('saveTransaction: Transação completa:', JSON.stringify(completeTransaction, null, 2));
+    
     // Atualizar saldo e salvar transação em paralelo
     const amountChange = transaction.type === 'income' ? transaction.amount : -transaction.amount;
     
@@ -82,12 +87,11 @@ export async function saveTransaction(userId: string, transaction: Omit<Transact
       updateUserBalance(userId, amountChange)
     ]);
 
-    // Atualizar cache local imediatamente
-    const cached = transactionsCache[userId];
-    if (cached) {
-      cached.transactions.unshift(completeTransaction);
-      cached.timestamp = Date.now();
-    }
+    console.log('saveTransaction: Transação salva no banco de dados');
+
+    // Limpar o cache para forçar uma nova busca
+    delete transactionsCache[userId];
+    console.log('saveTransaction: Cache limpo para forçar atualização');
 
     // Operações secundárias em background sem esperar
     setTimeout(() => {
@@ -103,15 +107,11 @@ export async function saveTransaction(userId: string, transaction: Omit<Transact
           userId,
           new Date(transaction.date).getFullYear(),
           new Date(transaction.date).getMonth()
-        ).catch(() => {}),
-        
-        transaction.goalAllocation && transaction.type === 'income'
-          ? allocateAmountToGoal(userId, transaction.goalAllocation, transaction.amount, transactionId)
-              .catch(() => {})
-          : Promise.resolve()
+        ).catch(() => {})
       ]).catch(() => {});
     }, 0);
     
+    console.log('saveTransaction: Transação salva com sucesso, ID:', transactionId);
     return transactionId;
   } catch (error) {
     console.error('Erro ao salvar transação:', error);
@@ -126,18 +126,24 @@ export async function saveTransaction(userId: string, transaction: Omit<Transact
  */
 export async function getTransactions(userId: string, forceRefresh = false): Promise<Transaction[]> {
   try {
+    console.log('getTransactions: Iniciando busca de transações');
+    console.log('getTransactions: Forçar atualização:', forceRefresh);
+    
     // Verificar cache
     const cached = transactionsCache[userId];
     const now = Date.now();
     
     if (!forceRefresh && cached && (now - cached.timestamp) < CACHE_DURATION) {
+      console.log('getTransactions: Retornando dados do cache');
       return cached.transactions;
     }
 
+    console.log('getTransactions: Buscando transações no banco de dados');
     const transactionsRef = ref(rtdb, `users/${userId}/transactions`);
     const snapshot = await get(transactionsRef);
     
     if (!snapshot.exists()) {
+      console.log('getTransactions: Nenhuma transação encontrada');
       transactionsCache[userId] = { transactions: [], timestamp: now };
       return [];
     }
@@ -156,6 +162,16 @@ export async function getTransactions(userId: string, forceRefresh = false): Pro
       return dateB - dateA;
     });
     
+    console.log('getTransactions: Total de transações encontradas:', sortedTransactions.length);
+    if (sortedTransactions.length > 0) {
+      console.log('getTransactions: Primeira transação:', {
+        id: sortedTransactions[0].id,
+        description: sortedTransactions[0].description,
+        date: sortedTransactions[0].date,
+        type: sortedTransactions[0].type
+      });
+    }
+    
     transactionsCache[userId] = { 
       transactions: sortedTransactions, 
       timestamp: now 
@@ -163,6 +179,7 @@ export async function getTransactions(userId: string, forceRefresh = false): Pro
     
     return sortedTransactions;
   } catch (error) {
+    console.error('getTransactions: Erro ao buscar transações:', error);
     throw error;
   }
 }

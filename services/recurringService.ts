@@ -1,7 +1,7 @@
 // services/recurringService.ts
 import { rtdb } from '../config/firebaseConfig';
 import { ref, push, set, get, update, remove, query, orderByChild, equalTo } from 'firebase/database';
-import { saveTransaction } from './transactionService';
+import { saveTransaction, Transaction } from './transactionService';
 import { updateBudgetSpent } from './budgetService';
 import { createRecurringTransactionNotification } from './notificationService';
 import { calculateAndSaveMonthlyStatistics } from './statisticsService';
@@ -29,6 +29,7 @@ export interface Recorrencia {
  */
 export async function saveRecorrencia(userId: string, recorrencia: Omit<Recorrencia, 'id' | 'status' | 'createdAt' | 'updatedAt'>): Promise<string> {
   try {
+    console.log('saveRecorrencia: Iniciando salvamento de recorrência');
     const recorrenciaRef = ref(rtdb, `users/${userId}/recorrencias`);
     const newRecorrenciaRef = push(recorrenciaRef);
     const now = new Date().toISOString();
@@ -41,7 +42,44 @@ export async function saveRecorrencia(userId: string, recorrencia: Omit<Recorren
       updatedAt: now
     };
 
+    console.log('saveRecorrencia: Salvando recorrência no banco de dados');
     await set(newRecorrenciaRef, newRecorrencia);
+    console.log('saveRecorrencia: Recorrência salva com sucesso');
+
+    // Verificar se a data de início é hoje
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    const dataInicio = new Date(recorrencia.dataInicio);
+    dataInicio.setHours(0, 0, 0, 0);
+
+    console.log('saveRecorrencia: Verificando data de início');
+    console.log('saveRecorrencia: Data de hoje:', hoje.toISOString());
+    console.log('saveRecorrencia: Data de início:', dataInicio.toISOString());
+
+    if (dataInicio.getTime() === hoje.getTime()) {
+      console.log('saveRecorrencia: Data de início é hoje, criando transação');
+      // Criar a transação imediatamente
+      const transaction: Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'> = {
+        type: recorrencia.tipo === 'despesa' ? 'expense' : 'income',
+        amount: recorrencia.valor,
+        description: recorrencia.descricao,
+        category: recorrencia.categoria,
+        date: hoje.toISOString(),
+        recurringId: newRecorrenciaRef.key || ''
+      };
+
+      console.log('saveRecorrencia: Dados da transação:', JSON.stringify(transaction, null, 2));
+      try {
+        const transactionId = await saveTransaction(userId, transaction);
+        console.log('saveRecorrencia: Transação criada com sucesso, ID:', transactionId);
+      } catch (error) {
+        console.error('saveRecorrencia: Erro ao criar transação:', error);
+        throw error;
+      }
+    } else {
+      console.log('saveRecorrencia: Data de início não é hoje, transação será criada no dia correto');
+    }
+
     return newRecorrenciaRef.key!;
   } catch (error) {
     console.error('Erro ao salvar recorrência:', error);
@@ -160,20 +198,43 @@ export async function processarRecorrencias(userId: string): Promise<number> {
       
       // Verificar se é o dia da recorrência
       if (hoje.getDate() === recorrencia.diaRecorrencia) {
-        // Criar a transação
-        const transaction = {
-          type: recorrencia.tipo === 'despesa' ? 'expense' : 'income',
-          amount: recorrencia.valor,
-          description: recorrencia.descricao,
-          category: recorrencia.categoria,
-          date: hoje.toISOString(),
-          recurringId: recorrencia.id,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        };
+        // Verificar se já existe uma transação para este mês
+        const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+        const fimMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0);
+        
+        const transactionsRef = ref(rtdb, `users/${userId}/transactions`);
+        const transactionsQuery = query(
+          transactionsRef,
+          orderByChild('recurringId'),
+          equalTo(recorrencia.id || '')
+        );
+        const snapshot = await get(transactionsQuery);
+        
+        let jaExisteTransacao = false;
+        if (snapshot.exists()) {
+          snapshot.forEach((childSnapshot) => {
+            const transaction = childSnapshot.val();
+            const transactionDate = new Date(transaction.date);
+            if (transactionDate >= inicioMes && transactionDate <= fimMes) {
+              jaExisteTransacao = true;
+            }
+          });
+        }
+        
+        if (!jaExisteTransacao) {
+          // Criar a transação
+          const transaction: Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'> = {
+            type: recorrencia.tipo === 'despesa' ? 'expense' : 'income',
+            amount: recorrencia.valor,
+            description: recorrencia.descricao,
+            category: recorrencia.categoria,
+            date: hoje.toISOString(),
+            recurringId: recorrencia.id || ''
+          };
 
-        await saveTransaction(userId, transaction);
-        processadas++;
+          await saveTransaction(userId, transaction);
+          processadas++;
+        }
       }
     }
     

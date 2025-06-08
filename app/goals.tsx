@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, TouchableOpacity, ScrollView, Dimensions, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, ScrollView, Dimensions, ActivityIndicator, Alert } from 'react-native';
 import { Text, Button } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -14,22 +14,27 @@ import GoalCard from '../components/Goals/GoalCard';
 import AddGoalModal from '../components/Goals/AddGoalModal';
 
 // Serviços
-import { Goal, getGoals, saveGoal, updateGoal, deleteGoal } from '../services/goalService';
+import { Goal, getGoals, createGoal, updateGoal, deleteGoal, allocateAmountToGoal } from '../services/goalService';
 import { getTransactionsByPeriod } from '../services/transactionService';
+import { getUserBalance, updateUserBalance } from '../services/userService';
+import { useBalance } from '../hooks/useBalance';
 
 const { width } = Dimensions.get('window');
 
 const GoalsScreen = () => {
   const router = useRouter();
+  const { updateBalance } = useBalance();
   const [isLoading, setIsLoading] = useState(true);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [filter, setFilter] = useState('all');
   const [isAddModalVisible, setIsAddModalVisible] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [userBalance, setUserBalance] = useState(0);
   
   // Carregar dados
   useEffect(() => {
     loadGoals();
+    loadUserBalance();
   }, []);
   
   const loadGoals = async () => {
@@ -51,7 +56,45 @@ const GoalsScreen = () => {
     }
   };
   
-  const handleAddGoal = async (goalData: any) => {
+  const loadUserBalance = async () => {
+    if (!auth.currentUser) return;
+    
+    try {
+      // Obter transações do ano atual
+      const now = new Date();
+      const startOfYear = new Date(now.getFullYear(), 0, 1, 0, 0, 0, 0);
+      const endOfYear = new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999);
+      
+      const transactions = await getTransactionsByPeriod(
+        auth.currentUser.uid,
+        startOfYear.toISOString(),
+        endOfYear.toISOString()
+      );
+      
+      // Calcular saldo anual
+      const income = transactions
+        .filter(t => t.type === 'income')
+        .reduce((sum, t) => sum + t.amount, 0);
+        
+      const expenses = transactions
+        .filter(t => t.type === 'expense')
+        .reduce((sum, t) => sum + t.amount, 0);
+        
+      const yearlyBalance = income - expenses;
+      setUserBalance(yearlyBalance);
+      
+      console.log('Saldo anual para metas:', yearlyBalance);
+    } catch (error) {
+      console.error('Erro ao carregar saldo:', error);
+    }
+  };
+  
+  const handleAddGoal = async (goalData: {
+    title: string;
+    targetAmount: number;
+    deadline: string;
+    category: string;
+  }) => {
     if (!auth.currentUser) {
       console.error('Usuário não autenticado');
       return;
@@ -68,11 +111,15 @@ const GoalsScreen = () => {
         targetAmount: goalData.targetAmount,
         currentAmount: 0,
         deadline: goalData.deadline,
-        category: goalData.category
+        category: goalData.category,
+        description: '',
+        priority: 'media' as const,
+        color: COLORS.primary,
+        icon: 'flag-outline'
       };
       
       // Salvar no Firebase
-      await saveGoal(userId, newGoal);
+      await createGoal(userId, newGoal);
       
       // Recarregar metas
       await loadGoals();
@@ -93,24 +140,56 @@ const GoalsScreen = () => {
     }
     
     try {
+      console.log('handleUpdateGoalProgress: Iniciando atualização de meta');
+      console.log('handleUpdateGoalProgress: Meta:', goalId);
+      console.log('handleUpdateGoalProgress: Valor:', amount);
+      
       const userId = auth.currentUser.uid;
+      
+      // Verificar se tem saldo suficiente
+      if (userBalance <= 0) {
+        Alert.alert(
+          'Saldo Insuficiente',
+          'Você não possui saldo disponível para adicionar à meta. O saldo anual não pode ser negativo.'
+        );
+        return;
+      }
+      
+      if (amount > userBalance) {
+        Alert.alert(
+          'Saldo Insuficiente',
+          'O valor a ser adicionado não pode ser maior que seu saldo anual disponível.'
+        );
+        return;
+      }
       
       // Encontrar meta atual
       const goal = goals.find(g => g.id === goalId);
       if (!goal) return;
       
-      // Calcular novo valor
-      const newAmount = goal.currentAmount + amount;
+      console.log('handleUpdateGoalProgress: Saldo atual:', userBalance);
+      console.log('handleUpdateGoalProgress: Novo saldo:', userBalance - amount);
       
-      // Atualizar no Firebase
-      await updateGoal(userId, goalId, { currentAmount: newAmount });
+      // Atualizar o saldo global primeiro
+      await updateBalance(-amount);
       
-      // Atualizar localmente
-      setGoals(goals.map(g => 
-        g.id === goalId ? { ...g, currentAmount: newAmount } : g
-      ));
+      // Atualizar o saldo local
+      setUserBalance(prevBalance => prevBalance - amount);
+      
+      // Alocar valor à meta
+      await allocateAmountToGoal(userId, goalId, amount);
+      
+      // Recarregar metas
+      await loadGoals();
+      
+      // Recarregar saldo
+      await loadUserBalance();
+      
+      console.log('handleUpdateGoalProgress: Meta atualizada com sucesso');
+      
     } catch (error) {
       console.error('Erro ao atualizar progresso da meta:', error);
+      Alert.alert('Erro', 'Não foi possível adicionar o valor à meta');
     }
   };
   
@@ -301,13 +380,14 @@ const GoalsScreen = () => {
                 title={goal.title}
                 targetAmount={goal.targetAmount}
                 currentAmount={goal.currentAmount}
-                deadline={goal.deadline}
+                deadline={goal.deadline || ''}
                 category={goal.category}
                 categoryIcon={getCategoryIcon(goal.category)}
                 categoryColor={getCategoryColor(goal.category)}
                 onPress={() => console.log('Meta selecionada:', goal.id)}
-                onAddProgress={(amount) => goal.id && handleUpdateGoalProgress(goal.id, amount)}
+                onAddProgress={(amount: number) => goal.id && handleUpdateGoalProgress(goal.id, amount)}
                 onDelete={() => goal.id && handleDeleteGoal(goal.id)}
+                userBalance={userBalance}
               />
             ))
           ) : (
@@ -396,7 +476,7 @@ const styles = StyleSheet.create({
   statsContainer: {
     flexDirection: 'row',
     backgroundColor: COLORS.surface,
-    borderRadius: LAYOUT.radius.lg,
+    borderRadius: LAYOUT.radius.large,
     marginHorizontal: LAYOUT.spacing.lg,
     marginTop: -25,
     padding: LAYOUT.spacing.md,
@@ -443,7 +523,7 @@ const styles = StyleSheet.create({
   filterButton: {
     paddingVertical: LAYOUT.spacing.xs,
     paddingHorizontal: LAYOUT.spacing.md,
-    borderRadius: LAYOUT.radius.full,
+    borderRadius: LAYOUT.radius.medium,
     marginRight: LAYOUT.spacing.sm,
     backgroundColor: COLORS.surface,
     borderWidth: 1,

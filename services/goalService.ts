@@ -235,6 +235,11 @@ export async function deleteGoal(userId: string, goalId: string): Promise<void> 
  */
 export async function allocateAmountToGoal(userId: string, goalId: string, amount: number, source?: string, notes?: string): Promise<string> {
   try {
+    console.log('allocateAmountToGoal: Iniciando alocação de valor para meta');
+    console.log('allocateAmountToGoal: Usuário:', userId);
+    console.log('allocateAmountToGoal: Meta:', goalId);
+    console.log('allocateAmountToGoal: Valor:', amount);
+    
     // Verificar se a meta existe
     const goal = await getGoal(userId, goalId);
     
@@ -242,21 +247,68 @@ export async function allocateAmountToGoal(userId: string, goalId: string, amoun
       throw new Error('Meta não encontrada');
     }
     
+    // Se não veio de uma transação, subtrair do saldo do usuário primeiro
+    if (!source) {
+      console.log('allocateAmountToGoal: Atualizando saldo do usuário');
+      const userRef = ref(rtdb, `users/${userId}/profile`);
+      const userSnapshot = await get(userRef);
+      const currentBalance = userSnapshot.val()?.totalBalance || 0;
+      
+      console.log('allocateAmountToGoal: Saldo atual:', currentBalance);
+      console.log('allocateAmountToGoal: Novo saldo:', currentBalance - amount);
+      
+      // Atualizar saldo do usuário
+      await update(userRef, {
+        totalBalance: currentBalance - amount,
+        updatedAt: new Date().toISOString()
+      });
+      
+      console.log('allocateAmountToGoal: Saldo atualizado com sucesso');
+      
+      // Criar transação de transferência
+      const transactionsRef = ref(rtdb, `users/${userId}/transactions`);
+      const newTransactionRef = push(transactionsRef);
+      const transactionId = newTransactionRef.key as string;
+      
+      const now = new Date().toISOString();
+      const transferTransaction = {
+        id: transactionId,
+        type: 'expense',
+        amount: amount,
+        description: `Transferência para meta: ${goal.title}`,
+        category: 'transferencia',
+        date: now,
+        goalAllocation: goalId,
+        createdAt: now,
+        updatedAt: now
+      };
+      
+      console.log('allocateAmountToGoal: Criando transação de transferência:', transferTransaction);
+      await set(newTransactionRef, transferTransaction);
+      console.log('allocateAmountToGoal: Transação de transferência criada com sucesso');
+    }
+    
     // Criar a alocação
     const allocationsRef = ref(rtdb, `users/${userId}/goals/${goalId}/allocations`);
     const newAllocationRef = push(allocationsRef);
     const allocationId = newAllocationRef.key as string;
     
-    const allocation: GoalAllocation = {
+    // Criar objeto base da alocação
+    const allocation: any = {
       id: allocationId,
       amount,
       date: new Date().toISOString(),
-      source,
-      notes,
       createdAt: new Date().toISOString()
     };
     
-    await set(newAllocationRef, allocation);
+    // Adicionar campos opcionais apenas se existirem
+    if (source) {
+      allocation.source = source;
+    }
+    
+    if (notes) {
+      allocation.notes = notes;
+    }
     
     // Atualizar o valor atual da meta
     await updateGoal(userId, goalId, {
@@ -264,11 +316,10 @@ export async function allocateAmountToGoal(userId: string, goalId: string, amoun
       status: 'in_progress'
     });
     
-    // Se não veio de uma transação, subtrair do saldo do usuário
-    if (!source) {
-      await updateUserBalance(userId, -amount);
-    }
+    // Salvar a alocação por último
+    await set(newAllocationRef, allocation);
     
+    console.log('allocateAmountToGoal: Alocação concluída com sucesso');
     return allocationId;
   } catch (error) {
     console.error('Erro ao alocar valor para meta:', error);

@@ -10,7 +10,7 @@ import { getTotalExpensesByMonth, getTotalIncomesByMonth } from './utils/transac
 // Interface para transações (unificando despesas e receitas)
 export interface Transaction {
   id?: string;
-  type: 'expense' | 'income';
+  type: 'expense' | 'income' | 'transfer';
   amount: number;
   description: string;
   category?: string;  // para despesas
@@ -80,12 +80,39 @@ export async function saveTransaction(userId: string, transaction: Omit<Transact
     console.log('saveTransaction: Transação completa:', JSON.stringify(completeTransaction, null, 2));
     
     // Atualizar saldo e salvar transação em paralelo
-    const amountChange = transaction.type === 'income' ? transaction.amount : -transaction.amount;
+    let amountChange = 0;
     
-    await Promise.all([
-      set(newTransactionRef, completeTransaction),
-      updateUserBalance(userId, amountChange)
-    ]);
+    if (transaction.type === 'income') {
+      amountChange = transaction.amount;
+    } else if (transaction.type === 'expense') {
+      amountChange = -transaction.amount;
+    }
+    // Transferências não afetam o saldo total
+    
+    console.log('saveTransaction: Atualizando saldo');
+    console.log('saveTransaction: Valor a ser alterado:', amountChange);
+    
+    // Atualizar o saldo primeiro (apenas se não for transferência)
+    if (transaction.type !== 'transfer') {
+      const userRef = ref(rtdb, `users/${userId}/profile`);
+      const userSnapshot = await get(userRef);
+      const currentBalance = userSnapshot.val()?.totalBalance || 0;
+      const newBalance = currentBalance + amountChange;
+      
+      console.log('saveTransaction: Saldo atual:', currentBalance);
+      console.log('saveTransaction: Novo saldo:', newBalance);
+      
+      await Promise.all([
+        set(newTransactionRef, completeTransaction),
+        update(userRef, {
+          totalBalance: newBalance,
+          updatedAt: now
+        })
+      ]);
+    } else {
+      // Se for transferência, apenas salvar a transação
+      await set(newTransactionRef, completeTransaction);
+    }
 
     console.log('saveTransaction: Transação salva no banco de dados');
 

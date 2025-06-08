@@ -222,18 +222,18 @@ export async function processarRecorrencias(userId: string): Promise<number> {
         }
         
         if (!jaExisteTransacao) {
-          // Criar a transação
+        // Criar a transação
           const transaction: Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'> = {
-            type: recorrencia.tipo === 'despesa' ? 'expense' : 'income',
-            amount: recorrencia.valor,
-            description: recorrencia.descricao,
-            category: recorrencia.categoria,
-            date: hoje.toISOString(),
+          type: recorrencia.tipo === 'despesa' ? 'expense' : 'income',
+          amount: recorrencia.valor,
+          description: recorrencia.descricao,
+          category: recorrencia.categoria,
+          date: hoje.toISOString(),
             recurringId: recorrencia.id || ''
-          };
+        };
 
-          await saveTransaction(userId, transaction);
-          processadas++;
+        await saveTransaction(userId, transaction);
+        processadas++;
         }
       }
     }

@@ -111,6 +111,7 @@ export async function updateUserBalance(userId: string, amount: number): Promise
       console.log('updateUserBalance: Perfil não encontrado, criando perfil inicial');
       // Criar perfil inicial com saldo zero
       const initialProfile: UserProfile = {
+        id: userId,
         displayName: '',
         email: '',
         totalBalance: amount,
@@ -130,6 +131,7 @@ export async function updateUserBalance(userId: string, amount: number): Promise
     console.log('updateUserBalance: Saldo atual:', currentBalance);
     console.log('updateUserBalance: Novo saldo:', newBalance);
     
+    // Atualizar o saldo
     await update(userRef, {
       totalBalance: newBalance,
       updatedAt: new Date().toISOString()

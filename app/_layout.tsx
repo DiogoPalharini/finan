@@ -10,6 +10,7 @@ import { AuthProvider } from '../contexts/AuthContext';
 import { DrawerProvider, useDrawer } from '../contexts/DrawerContext';
 import DrawerContent from '../components/Menu/DrawerContent';
 import MenuButton from '../components/Menu/MenuButton';
+import { BalanceProvider } from '../hooks/useBalance';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -113,49 +114,53 @@ function RootLayoutContent() {
   return (
     <AuthProvider>
       <PaperProvider>
-        <Portal>
-          <Modal
-            visible={isOpen}
-            onDismiss={closeDrawer}
-            contentContainerStyle={styles.modalContainer}
-            dismissable={true}
-          >
-            <Animated.View 
-              style={[
-                styles.backdrop,
-                { opacity: backdropOpacity }
-              ]}
-              pointerEvents={isOpen ? 'auto' : 'none'}
-              onTouchStart={closeDrawer}
-            />
-            <Animated.View
-              style={[
-                styles.drawerContainer,
-                { transform: [{ translateX: drawerTranslateX }] }
-              ]}
+        <DrawerProvider>
+          <BalanceProvider>
+            <Portal>
+              <Modal
+                visible={isOpen}
+                onDismiss={closeDrawer}
+                contentContainerStyle={styles.modalContainer}
+                dismissable={true}
+              >
+                <Animated.View 
+                  style={[
+                    styles.backdrop,
+                    { opacity: backdropOpacity }
+                  ]}
+                  pointerEvents={isOpen ? 'auto' : 'none'}
+                  onTouchStart={closeDrawer}
+                />
+                <Animated.View
+                  style={[
+                    styles.drawerContainer,
+                    { transform: [{ translateX: drawerTranslateX }] }
+                  ]}
+                >
+                  <DrawerContent 
+                    user={user} 
+                    navigateTo={navigateTo} 
+                    handleLogout={handleLogout}
+                    closeDrawer={closeDrawer}
+                    currentRoute={currentRoute}
+                  />
+                </Animated.View>
+              </Modal>
+            </Portal>
+            <Stack
+              screenOptions={{
+                header: isAuthScreen ? undefined : renderHeader,
+                headerShown: !isAuthScreen,
+                headerStyle: { backgroundColor: COLORS.background },
+                headerShadowVisible: false,
+              }}
             >
-              <DrawerContent 
-                user={user} 
-                navigateTo={navigateTo} 
-                handleLogout={handleLogout}
-                closeDrawer={closeDrawer}
-                currentRoute={currentRoute}
-              />
-            </Animated.View>
-          </Modal>
-        </Portal>
-        <Stack
-          screenOptions={{
-            header: isAuthScreen ? undefined : renderHeader,
-            headerShown: !isAuthScreen,
-            headerStyle: { backgroundColor: COLORS.background },
-            headerShadowVisible: false,
-          }}
-        >
-          <Stack.Screen name="index" options={{ headerShown: false }} />
-          <Stack.Screen name="recorrencias" options={{ headerShown: false }} />
-          <Stack.Screen name="recorrencia-form" options={{ headerShown: false }} />
-        </Stack>
+              <Stack.Screen name="index" options={{ headerShown: false }} />
+              <Stack.Screen name="recorrencias" options={{ headerShown: false }} />
+              <Stack.Screen name="recorrencia-form" options={{ headerShown: false }} />
+            </Stack>
+          </BalanceProvider>
+        </DrawerProvider>
       </PaperProvider>
     </AuthProvider>
   );
@@ -163,9 +168,15 @@ function RootLayoutContent() {
 
 export default function RootLayout() {
   return (
-    <DrawerProvider>
-      <RootLayoutContent />
-    </DrawerProvider>
+    <AuthProvider>
+      <PaperProvider>
+        <DrawerProvider>
+          <BalanceProvider>
+            <RootLayoutContent />
+          </BalanceProvider>
+        </DrawerProvider>
+      </PaperProvider>
+    </AuthProvider>
   );
 }
 

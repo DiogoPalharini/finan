@@ -11,8 +11,8 @@ interface TransactionItemProps {
   item: Transaction;
   formatCurrency: (value: number) => string;
   formatDate: (dateString: string) => string;
-  onLongPress: (item: Transaction) => void;
-  onPressDelete: (item: Transaction) => void;
+  onPress: () => void;
+  onPressDelete: () => void;
   incomeSources: CategoryItem[];
   expenseCategories: CategoryItem[];
 }
@@ -21,26 +21,40 @@ const TransactionItem: React.FC<TransactionItemProps> = ({
   item,
   formatCurrency,
   formatDate,
-  onLongPress,
+  onPress,
   onPressDelete,
   incomeSources,
   expenseCategories
 }) => {
   const categoryName = item.type === 'income'
     ? incomeSources.find(s => s.id === item.source)?.name || 'Outros'
-    : expenseCategories.find(c => c.id === item.category)?.name || 'Outros';
+    : item.type === 'expense'
+      ? expenseCategories.find(c => c.id === item.category)?.name || 'Outros'
+      : 'Transferência';
 
   return (
     <TouchableOpacity
-      onLongPress={() => onLongPress(item)}
+      onPress={onPress}
       activeOpacity={0.7}
       style={styles.transactionItem}
     >
       <View style={styles.transactionIconContainer}>
         <Ionicons
-          name={item.type === 'income' ? 'arrow-up-circle' : 'arrow-down-circle'}
+          name={
+            item.type === 'income' 
+              ? 'arrow-up-circle' 
+              : item.type === 'expense'
+                ? 'arrow-down-circle'
+                : 'swap-horizontal'
+          }
           size={32}
-          color={item.type === 'income' ? COLORS.success : COLORS.danger}
+          color={
+            item.type === 'income' 
+              ? COLORS.success 
+              : item.type === 'expense'
+                ? COLORS.danger
+                : COLORS.primary
+          }
         />
       </View>
       
@@ -63,9 +77,15 @@ const TransactionItem: React.FC<TransactionItemProps> = ({
       <View style={styles.transactionAmountContainer}>
         <Text style={[
           styles.transactionAmount,
-          { color: item.type === 'income' ? COLORS.success : COLORS.danger }
+          { 
+            color: item.type === 'income' 
+              ? COLORS.success 
+              : item.type === 'expense'
+                ? COLORS.danger
+                : COLORS.primary
+          }
         ]}>
-          {item.type === 'income' ? '+' : '-'} {formatCurrency(item.amount || 0)}
+          {item.type === 'income' ? '+' : item.type === 'expense' ? '-' : '↔'} {formatCurrency(item.amount || 0)}
         </Text>
         
         <TouchableOpacity

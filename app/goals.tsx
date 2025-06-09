@@ -12,6 +12,7 @@ import { auth } from '../config/firebaseConfig';
 // Componentes
 import GoalCard from '../components/Goals/GoalCard';
 import AddGoalModal from '../components/Goals/AddGoalModal';
+import EditGoalModal from '../components/Goals/EditGoalModal';
 
 // Serviços
 import { Goal, getGoals, createGoal, updateGoal, deleteGoal, allocateAmountToGoal } from '../services/goalService';
@@ -28,6 +29,8 @@ const GoalsScreen = () => {
   const [goals, setGoals] = useState<Goal[]>([]);
   const [filter, setFilter] = useState('all');
   const [isAddModalVisible, setIsAddModalVisible] = useState(false);
+  const [isEditModalVisible, setIsEditModalVisible] = useState(false);
+  const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const [userBalance, setUserBalance] = useState(0);
   
@@ -212,6 +215,34 @@ const GoalsScreen = () => {
     }
   };
   
+  const handleEditGoal = async (goalId: string, updates: Partial<Goal>) => {
+    if (!auth.currentUser) {
+      console.error('Usuário não autenticado');
+      return;
+    }
+    
+    setIsUpdating(true);
+    
+    try {
+      const userId = auth.currentUser.uid;
+      
+      // Atualizar no Firebase
+      await updateGoal(userId, goalId, updates);
+      
+      // Recarregar metas
+      await loadGoals();
+      
+      // Fechar modal
+      setIsEditModalVisible(false);
+      setEditingGoal(null);
+    } catch (error) {
+      console.error('Erro ao editar meta:', error);
+      Alert.alert('Erro', 'Não foi possível editar a meta');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+  
   const getFilteredGoals = () => {
     if (filter === 'all') {
       return goals;
@@ -377,14 +408,11 @@ const GoalsScreen = () => {
             filteredGoals.map((goal) => (
               <GoalCard
                 key={goal.id}
-                title={goal.title}
-                targetAmount={goal.targetAmount}
-                currentAmount={goal.currentAmount}
-                deadline={goal.deadline || ''}
-                category={goal.category}
-                categoryIcon={getCategoryIcon(goal.category)}
-                categoryColor={getCategoryColor(goal.category)}
-                onPress={() => console.log('Meta selecionada:', goal.id)}
+                goal={goal}
+                onPress={() => {
+                  setEditingGoal(goal);
+                  setIsEditModalVisible(true);
+                }}
                 onAddProgress={(amount: number) => goal.id && handleUpdateGoalProgress(goal.id, amount)}
                 onDelete={() => goal.id && handleDeleteGoal(goal.id)}
                 userBalance={userBalance}
@@ -423,6 +451,18 @@ const GoalsScreen = () => {
         visible={isAddModalVisible}
         onClose={() => setIsAddModalVisible(false)}
         onSave={handleAddGoal}
+        isLoading={isUpdating}
+      />
+
+      {/* Modal para editar meta */}
+      <EditGoalModal
+        visible={isEditModalVisible}
+        onClose={() => {
+          setIsEditModalVisible(false);
+          setEditingGoal(null);
+        }}
+        onSave={handleEditGoal}
+        goal={editingGoal}
         isLoading={isUpdating}
       />
     </View>

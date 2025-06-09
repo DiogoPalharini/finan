@@ -12,7 +12,7 @@ interface DeleteConfirmationModalProps {
   onClose: () => void;
   onConfirm: () => void;
   isLoading: boolean;
-  itemType: 'income' | 'expense';
+  itemType: 'income' | 'expense' | 'transfer';
   itemDescription: string;
 }
 
@@ -43,7 +43,7 @@ const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = ({
           <Text style={styles.confirmModalTitle}>Confirmar Exclusão</Text>
           
           <Text style={styles.confirmModalText}>
-            Tem certeza que deseja excluir {itemType === 'income' ? 'a receita' : 'a despesa'}{' '}
+            Tem certeza que deseja excluir {itemType === 'income' ? 'a receita' : itemType === 'expense' ? 'a despesa' : 'a transferência'}{' '}
             <Text style={styles.confirmModalHighlight}>
               {itemDescription}
             </Text>?

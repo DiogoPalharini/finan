@@ -7,16 +7,11 @@ import { LAYOUT } from '../../src/styles/layout';
 import { TYPO } from '../../src/styles/typography';
 import { format, isAfter, isBefore } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { Goal } from '../../services/goalService';
 
 interface GoalCardProps {
-  title: string;
-  targetAmount: number;
-  currentAmount: number;
-  deadline: string;
-  category: string;
-  categoryIcon: string;
-  categoryColor: string;
-  onPress?: () => void;
+  goal: Goal;
+  onPress: () => void;
   onAddProgress: (amount: number) => void;
   onDelete: () => void;
   userBalance: number;
@@ -25,13 +20,7 @@ interface GoalCardProps {
 const { width } = Dimensions.get('window');
 
 const GoalCard: React.FC<GoalCardProps> = ({
-  title,
-  targetAmount,
-  currentAmount,
-  deadline,
-  category,
-  categoryIcon,
-  categoryColor,
+  goal,
   onPress,
   onAddProgress,
   onDelete,
@@ -42,12 +31,12 @@ const GoalCard: React.FC<GoalCardProps> = ({
   const [isLoading, setIsLoading] = useState(false);
 
   // Calcular progresso
-  const progress = Math.min(currentAmount / targetAmount, 1);
+  const progress = Math.min(goal.currentAmount / goal.targetAmount, 1);
   const progressPercentage = Math.round(progress * 100);
   
   // Verificar status
-  const isCompleted = currentAmount >= targetAmount;
-  const isOverdue = !isCompleted && deadline && isAfter(new Date(), new Date(deadline));
+  const isCompleted = goal.currentAmount >= goal.targetAmount;
+  const isOverdue = !isCompleted && goal.deadline && isAfter(new Date(), new Date(goal.deadline));
   
   // Formatar valores monetários
   const formatCurrency = (value: number) => {
@@ -105,7 +94,7 @@ const GoalCard: React.FC<GoalCardProps> = ({
       return;
     }
 
-    if (currentAmount + numericAmount > targetAmount) {
+    if (goal.currentAmount + numericAmount > goal.targetAmount) {
       Alert.alert('Erro', 'O valor não pode exceder o valor alvo da meta');
       return;
     }
@@ -122,6 +111,24 @@ const GoalCard: React.FC<GoalCardProps> = ({
       setIsLoading(false);
     }
   };
+
+  const handleDelete = () => {
+    Alert.alert(
+      'Excluir Meta',
+      'Tem certeza que deseja excluir esta meta? Esta ação não pode ser desfeita.',
+      [
+        {
+          text: 'Cancelar',
+          style: 'cancel'
+        },
+        {
+          text: 'Excluir',
+          style: 'destructive',
+          onPress: onDelete
+        }
+      ]
+    );
+  };
   
   return (
     <>
@@ -131,30 +138,39 @@ const GoalCard: React.FC<GoalCardProps> = ({
         activeOpacity={0.9}
       >
         <View style={styles.header}>
-          <View style={[styles.categoryBadge, { backgroundColor: `${categoryColor}20` }]}>
-            <Ionicons name={categoryIcon as any} size={16} color={categoryColor} />
-            <Text style={[styles.categoryText, { color: categoryColor }]}>{category}</Text>
+          <View style={[styles.categoryBadge, { backgroundColor: `${goal.color || COLORS.primary}20` }]}>
+            <Ionicons name={goal.icon as any || 'flag-outline'} size={16} color={goal.color || COLORS.primary} />
+            <Text style={[styles.categoryText, { color: goal.color || COLORS.primary }]}>{goal.category}</Text>
           </View>
           
-          <Text style={[
-            styles.deadline,
-            isOverdue && styles.overdueText
-          ]}>
-            {isOverdue ? 'Atrasada' : deadline ? `Prazo: ${formatDate(deadline)}` : 'Sem prazo'}
-          </Text>
+          <View style={styles.headerRight}>
+            <Text style={[
+              styles.deadline,
+              isOverdue && styles.overdueText
+            ]}>
+              {isOverdue ? 'Atrasada' : goal.deadline ? `Prazo: ${formatDate(goal.deadline)}` : 'Sem prazo'}
+            </Text>
+            
+            <TouchableOpacity
+              onPress={handleDelete}
+              style={styles.deleteButton}
+            >
+              <Ionicons name="trash-outline" size={20} color={COLORS.danger} />
+            </TouchableOpacity>
+          </View>
         </View>
         
-        <Text style={styles.title} numberOfLines={1} ellipsizeMode="tail">{title}</Text>
+        <Text style={styles.title} numberOfLines={1} ellipsizeMode="tail">{goal.title}</Text>
         
         <View style={styles.amountsContainer}>
-          <Text style={styles.currentAmount}>{formatCurrency(currentAmount)}</Text>
-          <Text style={styles.targetAmount}>de {formatCurrency(targetAmount)}</Text>
+          <Text style={styles.currentAmount}>{formatCurrency(goal.currentAmount)}</Text>
+          <Text style={styles.targetAmount}>de {formatCurrency(goal.targetAmount)}</Text>
         </View>
         
         <View style={styles.progressContainer}>
           <ProgressBar 
             progress={progress} 
-            color={isOverdue ? COLORS.danger : categoryColor} 
+            color={isOverdue ? COLORS.danger : goal.color || COLORS.primary} 
             style={styles.progressBar} 
           />
           <Text style={styles.progressText}>{progressPercentage}%</Text>
@@ -201,7 +217,7 @@ const GoalCard: React.FC<GoalCardProps> = ({
           
           <View style={styles.modalContent}>
             <Text style={styles.modalLabel}>Valor disponível: {formatCurrency(userBalance)}</Text>
-            <Text style={styles.modalLabel}>Valor restante: {formatCurrency(targetAmount - currentAmount)}</Text>
+            <Text style={styles.modalLabel}>Valor restante: {formatCurrency(goal.targetAmount - goal.currentAmount)}</Text>
             
             <TextInput
               style={styles.input}
@@ -245,13 +261,21 @@ const styles = StyleSheet.create({
     borderRadius: LAYOUT.radius.large,
     padding: LAYOUT.spacing.md,
     marginBottom: LAYOUT.spacing.md,
-    ...LAYOUT.shadow.small,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: LAYOUT.spacing.sm,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   categoryBadge: {
     flexDirection: 'row',
@@ -269,9 +293,13 @@ const styles = StyleSheet.create({
     fontSize: TYPO.size.xs,
     fontFamily: TYPO.family.regular,
     color: COLORS.textSecondary,
+    marginRight: LAYOUT.spacing.sm,
   },
   overdueText: {
     color: COLORS.danger,
+  },
+  deleteButton: {
+    padding: 4,
   },
   title: {
     fontSize: TYPO.size.md,

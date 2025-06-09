@@ -11,10 +11,11 @@ import { ptBR } from 'date-fns/locale';
 import Title from '../src/components/Title';
 import BalanceCard from '../components/BalanceCard';
 import TransactionList from '../components/TransactionList';
-import IncomeModal from '../components/IncomeModal';
-import ExpenseModal from '../components/ExpenseModal';
+
 import DeleteConfirmationModal from '../components/DeleteConfirmationModal';
 import SettingsModal from '../components/settingsSaldo/SettingsModalImproved';
+import AddTransactionModal from '../components/AddTransactionModal';
+import EditTransactionModal from '../components/EditTransactionModal';
 
 // Estilos e constantes
 import { COLORS } from '../src/styles/colors';
@@ -34,7 +35,8 @@ import {
   getTransactionsByPeriod,
   getTransactionsByCategory,
   getBalanceByMonth,
-  getTransactions
+  getTransactions,
+  clearTransactionsCache
 } from '../services/transactionService';
 import { processarRecorrencias } from '../services/recurringService';
 import { useAuth } from '../hooks/useAuth';
@@ -43,7 +45,7 @@ import { getUserBalance } from '../services/userService';
 // Tipos
 export interface Transaction {
   id?: string;
-  type: 'income' | 'expense';
+  type: 'income' | 'expense' | 'transfer';
   description: string;
   amount: number;
   date: string;
@@ -119,21 +121,21 @@ const HomeScreen = () => {
   const [userBalance, setUserBalance] = useState<number>(0);
   
   // Estados para modais
-  const [incomeModalVisible, setIncomeModalVisible] = useState<boolean>(false);
-  const [expenseModalVisible, setExpenseModalVisible] = useState<boolean>(false);
   const [deleteModalVisible, setDeleteModalVisible] = useState<boolean>(false);
   const [itemToDelete, setItemToDelete] = useState<Transaction | null>(null);
-  const [fabOpen, setFabOpen] = useState<boolean>(false);
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [balanceView, setBalanceView] = useState<BalanceViewType>('mes_atual');
   const [periodStart, setPeriodStart] = useState<Date | null>(null);
   const [periodEnd, setPeriodEnd] = useState<Date | null>(null);
+  const [transactionModalVisible, setTransactionModalVisible] = useState<boolean>(false);
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
 
   // Carregar dados iniciais
   useEffect(() => {
     const loadInitialData = async () => {
       if (!user) return;
       
+      setIsLoading(true);
       try {
         // Carregar saldo primeiro
         await loadUserBalance();
@@ -145,6 +147,8 @@ const HomeScreen = () => {
       } catch (error) {
         console.error('Erro ao carregar dados iniciais:', error);
         Alert.alert('Erro', 'Não foi possível carregar seus dados.');
+      } finally {
+        setIsLoading(false);
       }
     };
 
@@ -281,70 +285,6 @@ const HomeScreen = () => {
     setFilteredTransactions(filtered);
   };
 
-  // Salvar nova receita
-  const handleSaveIncome = async (
-    amount: number, 
-    description: string, 
-    source: string, 
-    date: Date
-  ): Promise<void> => {
-    if (!user) {
-      Alert.alert('Erro', 'Você precisa estar logado para adicionar uma receita.');
-      return;
-    }
-    
-    setIsLoading(true);
-    try {
-      await saveIncome(user.uid, {
-        amount,
-        description,
-        source,
-        date: date.toISOString()
-      });
-      
-      setIncomeModalVisible(false);
-      loadTransactions();
-      Alert.alert('Sucesso', 'Receita adicionada com sucesso!');
-    } catch (error) {
-      console.error('Erro ao salvar receita:', error);
-      Alert.alert('Erro', 'Não foi possível salvar a receita.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Salvar nova despesa
-  const handleSaveExpense = async (
-    amount: number, 
-    description: string, 
-    category: string, 
-    date: Date
-  ): Promise<void> => {
-    if (!user) {
-      Alert.alert('Erro', 'Você precisa estar logado para adicionar uma despesa.');
-      return;
-    }
-    
-    setIsLoading(true);
-    try {
-      await saveExpense(user.uid, {
-        amount,
-        description,
-        category,
-        date: date.toISOString()
-      });
-      
-      setExpenseModalVisible(false);
-      loadTransactions();
-      Alert.alert('Sucesso', 'Despesa adicionada com sucesso!');
-    } catch (error) {
-      console.error('Erro ao salvar despesa:', error);
-      Alert.alert('Erro', 'Não foi possível salvar a despesa.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   // Confirmar exclusão de transação
   const confirmDelete = (item: Transaction): void => {
     setItemToDelete(item);
@@ -419,6 +359,28 @@ const HomeScreen = () => {
     setPeriodEnd(end);
     if (start && end) {
       setBalanceView('periodo');
+    }
+  };
+
+  // Função para atualizar os dados após uma operação
+  const handleOperationSuccess = async () => {
+    if (!user) return;
+    
+    setIsLoading(true);
+    try {
+      // Limpar o cache de transações
+      await clearTransactionsCache(user.uid);
+      
+      // Recarregar saldo e transações
+      await loadUserBalance();
+      await loadTransactions();
+      
+      console.log('HomeScreen: Dados atualizados com sucesso após operação');
+    } catch (error) {
+      console.error('Erro ao atualizar dados:', error);
+      Alert.alert('Erro', 'Não foi possível atualizar os dados.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -502,61 +464,32 @@ const HomeScreen = () => {
         transactions={displayedTransactions}
         formatCurrency={formatCurrency}
         formatDate={formatDate}
-        onLongPressItem={confirmDelete}
+        onPressItem={(transaction) => {
+          if (transaction.type !== 'transfer') {
+            setEditingTransaction(transaction);
+          }
+        }}
         onPressDelete={confirmDelete}
         incomeSources={incomeSources}
         expenseCategories={expenseCategories}
       />
 
       {/* Botões de Ação Flutuantes */}
-      <FAB.Group
-        visible={true}
-        open={fabOpen}
-        icon={fabOpen ? 'close' : 'plus'}
+      <FAB
+        icon="plus"
+        style={styles.fab}
+        onPress={() => setTransactionModalVisible(true)}
         color={COLORS.white}
-        fabStyle={styles.fab}
-        onStateChange={({ open }) => setFabOpen(open)}
-        actions={[
-          {
-            icon: 'arrow-up',
-            label: 'Nova Receita',
-            color: COLORS.success,
-            onPress: () => setIncomeModalVisible(true),
-          },
-          {
-            icon: 'arrow-down',
-            label: 'Nova Despesa',
-            color: COLORS.danger,
-            onPress: () => setExpenseModalVisible(true),
-          },
-        ]}
-      />
-
-      {/* Modal de Nova Receita */}
-      <IncomeModal 
-        visible={incomeModalVisible}
-        onClose={() => setIncomeModalVisible(false)}
-        onSave={handleSaveIncome}
-        isLoading={isLoading}
-        incomeSources={incomeSources}
-        formatValueForInput={formatValueForInput}
-      />
-
-      {/* Modal de Nova Despesa */}
-      <ExpenseModal 
-        visible={expenseModalVisible}
-        onClose={() => setExpenseModalVisible(false)}
-        onSave={handleSaveExpense}
-        isLoading={isLoading}
-        expenseCategories={expenseCategories}
-        formatValueForInput={formatValueForInput}
       />
 
       {/* Modal de Confirmação de Exclusão */}
       <DeleteConfirmationModal 
         visible={deleteModalVisible}
         onClose={() => setDeleteModalVisible(false)}
-        onConfirm={handleDelete}
+        onConfirm={async () => {
+          await handleDelete();
+          handleOperationSuccess();
+        }}
         isLoading={isLoading}
         itemType={itemToDelete?.type || 'expense'}
         itemDescription={itemToDelete?.description || ''}
@@ -570,6 +503,22 @@ const HomeScreen = () => {
         periodStart={periodStart}
         periodEnd={periodEnd}
         onChangePeriod={handleChangePeriod}
+      />
+
+      <AddTransactionModal 
+        visible={transactionModalVisible}
+        onClose={() => setTransactionModalVisible(false)}
+        onSuccess={() => {
+          setTransactionModalVisible(false);
+          handleOperationSuccess();
+        }}
+      />
+
+      <EditTransactionModal
+        visible={!!editingTransaction}
+        onClose={() => setEditingTransaction(null)}
+        transaction={editingTransaction}
+        onSuccess={handleOperationSuccess}
       />
     </View>
   );
@@ -622,6 +571,10 @@ const styles = StyleSheet.create({
     color: COLORS.background,
   },
   fab: {
+    position: 'absolute',
+    margin: 16,
+    right: 0,
+    bottom: 0,
     backgroundColor: COLORS.primary,
   },
 });

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, TouchableOpacity, ScrollView, Dimensions } from 'react-native';
+import React from 'react';
+import { View, StyleSheet, TouchableOpacity } from 'react-native';
 import { Text, ProgressBar } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../../src/styles/colors';
@@ -14,9 +14,8 @@ interface BudgetCardProps {
   spent: number;
   remainingDays: number;
   onPress?: () => void;
+  onDelete?: () => void;
 }
-
-const { width } = Dimensions.get('window');
 
 const BudgetCard: React.FC<BudgetCardProps> = ({
   category,
@@ -25,7 +24,8 @@ const BudgetCard: React.FC<BudgetCardProps> = ({
   limit,
   spent,
   remainingDays,
-  onPress
+  onPress,
+  onDelete
 }) => {
   // Calcular progresso
   const progress = Math.min(spent / limit, 1);
@@ -65,32 +65,46 @@ const BudgetCard: React.FC<BudgetCardProps> = ({
           <Text style={styles.category}>{category}</Text>
         </View>
         
-        <View style={[
-          styles.statusBadge, 
-          { 
-            backgroundColor: isOverBudget 
-              ? `${COLORS.danger}20` 
-              : isNearLimit 
-                ? `${COLORS.warning}20` 
-                : `${COLORS.success}20` 
-          }
-        ]}>
-          <Text style={[
-            styles.statusText, 
+        <View style={styles.headerActions}>
+          {onDelete && (
+            <TouchableOpacity
+              style={styles.deleteButton}
+              onPress={(e) => {
+                e.stopPropagation();
+                onDelete();
+              }}
+            >
+              <Ionicons name="trash-outline" size={20} color={COLORS.danger} />
+            </TouchableOpacity>
+          )}
+          
+          <View style={[
+            styles.statusBadge, 
             { 
-              color: isOverBudget 
-                ? COLORS.danger 
+              backgroundColor: isOverBudget 
+                ? `${COLORS.danger}20` 
                 : isNearLimit 
-                  ? COLORS.warning 
-                  : COLORS.success 
+                  ? `${COLORS.warning}20` 
+                  : `${COLORS.success}20` 
             }
           ]}>
-            {isOverBudget 
-              ? 'Excedido' 
-              : isNearLimit 
-                ? 'Atenção' 
-                : 'Dentro do limite'}
-          </Text>
+            <Text style={[
+              styles.statusText, 
+              { 
+                color: isOverBudget 
+                  ? COLORS.danger 
+                  : isNearLimit 
+                    ? COLORS.warning 
+                    : COLORS.success 
+              }
+            ]}>
+              {isOverBudget 
+                ? 'Excedido' 
+                : isNearLimit 
+                  ? 'Atenção' 
+                  : 'Dentro do limite'}
+            </Text>
+          </View>
         </View>
       </View>
       
@@ -139,10 +153,14 @@ const BudgetCard: React.FC<BudgetCardProps> = ({
 const styles = StyleSheet.create({
   container: {
     backgroundColor: COLORS.surface,
-    borderRadius: LAYOUT.radius.lg,
+    borderRadius: LAYOUT.radius.large,
     padding: LAYOUT.spacing.md,
     marginBottom: LAYOUT.spacing.md,
-    ...LAYOUT.shadow.small,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
   header: {
     flexDirection: 'row',
@@ -153,6 +171,14 @@ const styles = StyleSheet.create({
   categoryContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  deleteButton: {
+    padding: LAYOUT.spacing.xs,
+    marginRight: LAYOUT.spacing.sm,
   },
   iconContainer: {
     width: 36,
@@ -168,9 +194,9 @@ const styles = StyleSheet.create({
     color: COLORS.text,
   },
   statusBadge: {
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: LAYOUT.radius.full,
+    paddingVertical: LAYOUT.spacing.xs,
+    paddingHorizontal: LAYOUT.spacing.sm,
+    borderRadius: LAYOUT.radius.default,
   },
   statusText: {
     fontSize: TYPO.size.xs,
@@ -224,7 +250,7 @@ const styles = StyleSheet.create({
     fontSize: TYPO.size.xs,
     fontFamily: TYPO.family.regular,
     color: COLORS.textSecondary,
-    marginLeft: 4,
+    marginLeft: LAYOUT.spacing.xs,
   },
 });
 

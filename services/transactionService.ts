@@ -6,6 +6,7 @@ import { createRecurringTransactionNotification } from './notificationService';
 import { calculateAndSaveMonthlyStatistics } from './statisticsService';
 import { allocateAmountToGoal } from './goalService';
 import { getTotalExpensesByMonth, getTotalIncomesByMonth } from './utils/transactionUtils';
+import { updateBudgetsOnNewExpense } from './budgetService';
 
 // Interface para transações (unificando despesas e receitas)
 export interface Transaction {
@@ -324,6 +325,50 @@ export async function updateTransaction(userId: string, transactionId: string, u
   }
 }
 
+export async function updateExpense(userId: string, expenseId: string, expenseData: Partial<Expense>): Promise<void> {
+  try {
+    console.log('updateExpense: Iniciando atualização de despesa');
+    
+    const transaction: Partial<Transaction> = {
+      type: 'expense',
+      amount: expenseData.amount,
+      description: expenseData.description,
+      category: expenseData.category,
+      date: expenseData.date,
+      updatedAt: new Date().toISOString()
+    };
+
+    console.log('updateExpense: Convertendo para transação:', transaction);
+    await updateTransaction(userId, expenseId, transaction);
+    console.log('updateExpense: Transação atualizada com sucesso');
+  } catch (error) {
+    console.error('Erro ao atualizar despesa:', error);
+    throw error;
+  }
+}
+
+export async function updateIncome(userId: string, incomeId: string, incomeData: Partial<Income>): Promise<void> {
+  try {
+    console.log('updateIncome: Iniciando atualização de receita');
+    
+    const transaction: Partial<Transaction> = {
+      type: 'income',
+      amount: incomeData.amount,
+      description: incomeData.description,
+      source: incomeData.source,
+      date: incomeData.date,
+      updatedAt: new Date().toISOString()
+    };
+
+    console.log('updateIncome: Convertendo para transação:', transaction);
+    await updateTransaction(userId, incomeId, transaction);
+    console.log('updateIncome: Transação atualizada com sucesso');
+  } catch (error) {
+    console.error('Erro ao atualizar receita:', error);
+    throw error;
+  }
+}
+
 /**
  * Exclui uma transação
  * @param userId ID do usuário
@@ -571,5 +616,31 @@ export function clearTransactionsCache(userId?: string) {
     delete transactionsCache[userId];
   } else {
     transactionsCache = {};
+  }
+}
+
+export async function addTransaction(userId: string, transaction: Omit<Transaction, 'id' | 'createdAt'>): Promise<string> {
+  try {
+    const now = new Date();
+    const transactionRef = ref(rtdb, `users/${userId}/transactions`);
+    const newTransactionRef = push(transactionRef);
+    
+    const newTransaction: Transaction = {
+      ...transaction,
+      id: newTransactionRef.key!,
+      createdAt: now.toISOString()
+    };
+    
+    await set(newTransactionRef, newTransaction);
+    
+    // Se for uma despesa, atualizar os orçamentos
+    if (transaction.type === 'expense') {
+      await updateBudgetsOnNewExpense(userId, transaction.category, transaction.amount);
+    }
+    
+    return newTransaction.id;
+  } catch (error) {
+    console.error('Erro ao adicionar transação:', error);
+    throw error;
   }
 }

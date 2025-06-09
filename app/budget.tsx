@@ -14,7 +14,7 @@ import BudgetCard from '../components/Budget/BudgetCard';
 import AddBudgetModal from '../components/Budget/AddBudgetModal';
 
 // Serviços
-import { Budget, getBudgets, saveBudget, updateBudget, deleteBudget } from '../services/budgetService';
+import { Budget, getBudgets, createBudget, updateBudget, deleteBudget, updateBudgetSpent } from '../services/budgetService';
 import { getTransactionsByCategory } from '../services/transactionService';
 
 const { width } = Dimensions.get('window');
@@ -22,10 +22,11 @@ const { width } = Dimensions.get('window');
 const BudgetScreen = () => {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
-  const [budgets, setBudgets] = useState<any[]>([]);
+  const [budgets, setBudgets] = useState<Budget[]>([]);
   const [filter, setFilter] = useState('all');
   const [isAddModalVisible, setIsAddModalVisible] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [selectedBudget, setSelectedBudget] = useState<Budget | null>(null);
   
   // Carregar dados
   useEffect(() => {
@@ -44,49 +45,15 @@ const BudgetScreen = () => {
       const userId = auth.currentUser.uid;
       const budgetsData = await getBudgets(userId);
       
-      // Calcular gastos atuais para cada orçamento
-      const budgetsWithSpent = await Promise.all(
+      // Atualizar gastos de cada orçamento
+      const updatedBudgets = await Promise.all(
         budgetsData.map(async (budget) => {
-          const now = new Date();
-          const year = now.getFullYear();
-          const month = now.getMonth();
-          
-          // Buscar despesas da categoria no mês atual
-          const expenses = await getTransactionsByCategory(userId, 'expense', budget.category);
-          const categoryExpenses = expenses.filter(expense => {
-            const expenseDate = new Date(expense.date);
-            return expenseDate.getFullYear() === year && expenseDate.getMonth() === month;
-          });
-          
-          // Calcular total gasto
-          const spent = categoryExpenses.reduce((sum, expense) => sum + expense.amount, 0);
-          
-          // Calcular dias restantes no período
-          const startDate = new Date(budget.startDate.split('/').reverse().join('-'));
-          let endDate;
-          
-          if (budget.period === 'monthly') {
-            endDate = new Date(startDate);
-            endDate.setMonth(endDate.getMonth() + 1);
-          } else if (budget.period === 'weekly') {
-            endDate = new Date(startDate);
-            endDate.setDate(endDate.getDate() + 7);
-          } else {
-            endDate = new Date(startDate);
-            endDate.setFullYear(endDate.getFullYear() + 1);
-          }
-          
-          const remainingDays = Math.max(0, Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
-          
-          return {
-            ...budget,
-            spent,
-            remainingDays
-          };
+          await updateBudgetSpent(userId, budget.id);
+          return budget;
         })
       );
       
-      setBudgets(budgetsWithSpent);
+      setBudgets(updatedBudgets);
     } catch (error) {
       console.error('Erro ao carregar orçamentos:', error);
     } finally {
@@ -94,9 +61,62 @@ const BudgetScreen = () => {
     }
   };
   
-  const handleAddBudget = async (budgetData: any) => {
+  const handleAddBudget = async (budgetData: Partial<Budget>) => {
     if (!auth.currentUser) {
       console.error('Usuário não autenticado');
+      return;
+    }
+    
+    setIsUpdating(true);
+    
+    const newBudget: Budget = {
+      id: '',
+      category: budgetData.category || '',
+      limit: budgetData.limit || 0,
+      period: budgetData.period || 'monthly',
+      startDate: new Date().toISOString(),
+      warningThreshold: budgetData.warningThreshold || 80,
+      notifications: budgetData.notifications || true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      spent: 0,
+      remaining: budgetData.limit || 0,
+      status: 'on_track'
+    };
+
+    try {
+      await createBudget(auth.currentUser.uid, newBudget);
+      await loadBudgets();
+      setIsAddModalVisible(false);
+      setSelectedBudget(null);
+    } catch (error: any) {
+      console.error('Error creating budget:', error);
+      if (error.message.includes('already exists')) {
+        setSelectedBudget({
+          ...newBudget,
+          error: `Já existe um orçamento para a categoria "${budgetData.category}". Por favor, escolha outra categoria ou edite o orçamento existente.`
+        });
+        setIsAddModalVisible(true);
+      } else {
+        setSelectedBudget({
+          ...newBudget,
+          error: 'Ocorreu um erro ao tentar criar o orçamento. Por favor, verifique os dados e tente novamente.'
+        });
+        setIsAddModalVisible(true);
+      }
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+  
+  const handleEditBudget = async (budget: Budget) => {
+    setSelectedBudget(budget);
+    setIsAddModalVisible(true);
+  };
+  
+  const handleUpdateBudget = async (budgetData: any) => {
+    if (!auth.currentUser || !selectedBudget) {
+      console.error('Usuário não autenticado ou orçamento não selecionado');
       return;
     }
     
@@ -105,24 +125,25 @@ const BudgetScreen = () => {
     try {
       const userId = auth.currentUser.uid;
       
-      // Preparar dados do orçamento
-      const newBudget = {
-        category: budgetData.category,
+      // Atualizar orçamento
+      await updateBudget(userId, selectedBudget.id, {
         limit: budgetData.limit,
-        period: budgetData.period,
-        startDate: budgetData.startDate
-      };
-      
-      // Salvar no Firebase
-      await saveBudget(userId, newBudget);
+        warningThreshold: budgetData.warningThreshold,
+        notifications: budgetData.notifications
+      });
       
       // Recarregar orçamentos
       await loadBudgets();
       
-      // Fechar modal
+      // Fechar modal e limpar seleção
       setIsAddModalVisible(false);
+      setSelectedBudget(null);
     } catch (error) {
-      console.error('Erro ao adicionar orçamento:', error);
+      console.error('Erro ao atualizar orçamento:', error);
+      setSelectedBudget({
+        ...selectedBudget,
+        error: 'Ocorreu um erro ao atualizar o orçamento. Por favor, tente novamente.'
+      });
     } finally {
       setIsUpdating(false);
     }
@@ -153,14 +174,11 @@ const BudgetScreen = () => {
     }
     
     if (filter === 'warning') {
-      return budgets.filter(budget => {
-        const progress = budget.spent / budget.limit;
-        return progress >= 0.8 && progress < 1;
-      });
+      return budgets.filter(budget => budget.status === 'warning');
     }
     
     if (filter === 'exceeded') {
-      return budgets.filter(budget => budget.spent > budget.limit);
+      return budgets.filter(budget => budget.status === 'exceeded');
     }
     
     return budgets;
@@ -169,7 +187,7 @@ const BudgetScreen = () => {
   const getBudgetStats = () => {
     const total = budgets.reduce((sum, budget) => sum + budget.limit, 0);
     const spent = budgets.reduce((sum, budget) => sum + budget.spent, 0);
-    const exceeded = budgets.filter(budget => budget.spent > budget.limit).length;
+    const exceeded = budgets.filter(budget => budget.status === 'exceeded').length;
     
     return {
       total,
@@ -343,9 +361,9 @@ const BudgetScreen = () => {
                   categoryColor={categoryInfo.color}
                   limit={budget.limit}
                   spent={budget.spent}
-                  remainingDays={budget.remainingDays}
-                  onPress={() => console.log('Orçamento selecionado:', budget.id)}
-                  onDelete={() => budget.id && handleDeleteBudget(budget.id)}
+                  remainingDays={30} // TODO: Calcular dias restantes
+                  onPress={() => handleEditBudget(budget)}
+                  onDelete={() => handleDeleteBudget(budget.id)}
                 />
               );
             })
@@ -364,7 +382,10 @@ const BudgetScreen = () => {
       {/* Botão flutuante para adicionar orçamento */}
       <TouchableOpacity
         style={styles.addButton}
-        onPress={() => setIsAddModalVisible(true)}
+        onPress={() => {
+          setSelectedBudget(null);
+          setIsAddModalVisible(true);
+        }}
         activeOpacity={0.8}
       >
         <LinearGradient
@@ -377,12 +398,16 @@ const BudgetScreen = () => {
         </LinearGradient>
       </TouchableOpacity>
       
-      {/* Modal para adicionar orçamento */}
+      {/* Modal para adicionar/editar orçamento */}
       <AddBudgetModal
         visible={isAddModalVisible}
-        onClose={() => setIsAddModalVisible(false)}
-        onSave={handleAddBudget}
+        onClose={() => {
+          setIsAddModalVisible(false);
+          setSelectedBudget(null);
+        }}
+        onSave={selectedBudget ? handleUpdateBudget : handleAddBudget}
         isLoading={isUpdating}
+        budget={selectedBudget}
       />
     </View>
   );
@@ -434,7 +459,7 @@ const styles = StyleSheet.create({
   },
   summaryContainer: {
     backgroundColor: COLORS.surface,
-    borderRadius: LAYOUT.radius.lg,
+    borderRadius: LAYOUT.radius.large,
     marginHorizontal: LAYOUT.spacing.lg,
     marginTop: -25,
     padding: LAYOUT.spacing.md,
@@ -514,7 +539,7 @@ const styles = StyleSheet.create({
   filterButton: {
     paddingVertical: LAYOUT.spacing.xs,
     paddingHorizontal: LAYOUT.spacing.md,
-    borderRadius: LAYOUT.radius.full,
+    borderRadius: LAYOUT.radius.default,
     marginRight: LAYOUT.spacing.sm,
     backgroundColor: COLORS.surface,
     borderWidth: 1,

@@ -13,7 +13,7 @@ interface TransactionListProps {
   transactions: Transaction[];
   formatCurrency: (value: number) => string;
   formatDate: (dateString: string) => string;
-  onLongPressItem: (item: Transaction) => void;
+  onPressItem: (transaction: Transaction) => void;
   onPressDelete: (item: Transaction) => void;
   incomeSources: CategoryItem[];
   expenseCategories: CategoryItem[];
@@ -24,7 +24,7 @@ const TransactionList: React.FC<TransactionListProps> = ({
   transactions,
   formatCurrency,
   formatDate,
-  onLongPressItem,
+  onPressItem,
   onPressDelete,
   incomeSources,
   expenseCategories
@@ -58,13 +58,13 @@ const TransactionList: React.FC<TransactionListProps> = ({
           item={item}
           formatCurrency={formatCurrency}
           formatDate={formatDate}
-          onLongPress={onLongPressItem}
-          onPressDelete={onPressDelete}
+          onPress={() => onPressItem(item)}
+          onPressDelete={() => onPressDelete(item)}
           incomeSources={incomeSources}
           expenseCategories={expenseCategories}
         />
       )}
-      keyExtractor={item => `${item.type}-${item.id}`}
+      keyExtractor={(item) => item.id || Math.random().toString()}
       contentContainerStyle={styles.transactionList}
       showsVerticalScrollIndicator={false}
     />

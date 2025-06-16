@@ -1,0 +1,24 @@
+{
+  "name": "finan",
+  "version": "1.0.0",
+  "description": "Finan - Seu aplicativo de controle financeiro",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "android": "expo run:android",
+    "ios": "expo run:ios"
+  },
+  "keywords": [
+    "finan",
+    "finance",
+    "money",
+    "budget"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "expo": "~52.0.46",
+    "react": "18.3.1",
+    "react-native": "0.76.9"
+  }
+}

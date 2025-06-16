@@ -34,66 +34,45 @@ const DrawerContent: React.FC<DrawerContentProps> = ({
       label: 'Início',
       icon: 'home-outline',
       route: '/HomeScreen',
-      active: currentRoute === '/HomeScreen',
+      isActive: currentRoute === '/HomeScreen',
     },
     {
       key: 'recorrencias',
       label: 'Recorrências',
       icon: 'repeat-outline',
       route: '/recorrencias',
-      active: currentRoute === '/recorrencias',
+      isActive: currentRoute === '/recorrencias',
     },
     {
       key: 'charts',
       label: 'Gráficos',
       icon: 'bar-chart-outline',
       route: '/ChartsScreen',
-      active: currentRoute === '/charts',
+      isActive: currentRoute === '/charts',
     },
     {
       key: 'goals',
       label: 'Metas',
       icon: 'flag-outline',
       route: '/goals',
-      active: currentRoute === '/goals',
+      isActive: currentRoute === '/goals',
     },
     {
       key: 'budget',
       label: 'Planejamento',
       icon: 'wallet-outline',
       route: '/budget',
-      active: currentRoute === '/budget',
-    },
-    {
-      key: 'reports',
-      label: 'Relatórios',
-      icon: 'document-text-outline',
-      route: '/reports',
-      active: currentRoute === '/reports',
+      isActive: currentRoute === '/budget',
     },
   ]);
 
-  const [settingsItems] = React.useState([
-    {
-      key: 'profile',
-      label: 'Perfil',
-      icon: 'person-outline',
-      route: '/profile',
-      active: currentRoute === '/profile',
-    },
-    {
-      key: 'settings',
-      label: 'Config.',
-      icon: 'settings-outline',
-      route: '/settings',
-      active: currentRoute === '/settings',
-    },
+  const [helpItems] = React.useState([
     {
       key: 'help',
       label: 'Ajuda',
       icon: 'help-circle-outline',
       route: '/help',
-      active: currentRoute === '/help',
+      isActive: currentRoute === '/help',
     },
   ]);
 
@@ -103,16 +82,6 @@ const DrawerContent: React.FC<DrawerContentProps> = ({
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.closeButton}
-          onPress={closeDrawer}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="close" size={24} color={COLORS.textSecondary} />
-        </TouchableOpacity>
-      </View>
-      
       <Animated.ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
@@ -130,37 +99,33 @@ const DrawerContent: React.FC<DrawerContentProps> = ({
         <View style={styles.menuContainer}>
           <Text style={styles.menuSectionTitle}>Menu Principal</Text>
           
-          {menuItems.map((item, index) => (
+          {menuItems.map((item) => (
             <MenuItem
               key={item.key}
               icon={item.icon}
               label={item.label}
-              active={item.active}
+              isActive={item.isActive}
               onPress={() => navigateTo(item.route)}
-              index={index}
             />
           ))}
           
           <View style={styles.divider} />
           
-          <Text style={styles.menuSectionTitle}>Configurações</Text>
+          <Text style={styles.menuSectionTitle}>Suporte</Text>
           
-          {settingsItems.map((item, index) => (
+          {helpItems.map((item) => (
             <MenuItem
               key={item.key}
               icon={item.icon}
               label={item.label}
-              active={item.active}
+              isActive={item.isActive}
               onPress={() => navigateTo(item.route)}
-              index={menuItems.length + index}
             />
           ))}
-          
-          <View style={styles.spacer} />
         </View>
-      </Animated.ScrollView>
-      
-      <View style={styles.footer}>
+        
+        <View style={styles.spacer} />
+        
         <TouchableOpacity
           style={styles.logoutButton}
           onPress={handleLogout}
@@ -178,7 +143,7 @@ const DrawerContent: React.FC<DrawerContentProps> = ({
         </TouchableOpacity>
         
         <Text style={styles.versionText}>Finan v1.0.0</Text>
-      </View>
+      </Animated.ScrollView>
     </View>
   );
 };
@@ -187,20 +152,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    paddingTop: 16,
-    paddingRight: 16,
-  },
-  closeButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(0, 0, 0, 0.05)',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   scrollView: {
     flex: 1,
@@ -227,26 +178,16 @@ const styles = StyleSheet.create({
   spacer: {
     height: 60,
   },
-  footer: {
-    padding: LAYOUT.spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.divider,
-  },
   logoutButton: {
-    borderRadius: LAYOUT.radius.large,
+    marginHorizontal: LAYOUT.spacing.md,
+    borderRadius: 12,
     overflow: 'hidden',
-    marginBottom: LAYOUT.spacing.md,
-    elevation: 2,
-    shadowColor: COLORS.secondary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
   },
   logoutGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: LAYOUT.spacing.sm,
+    paddingVertical: 12,
     paddingHorizontal: LAYOUT.spacing.md,
   },
   logoutText: {
@@ -256,10 +197,11 @@ const styles = StyleSheet.create({
     marginLeft: LAYOUT.spacing.sm,
   },
   versionText: {
+    textAlign: 'center',
     fontSize: TYPO.size.xs,
     fontFamily: TYPO.family.regular,
     color: COLORS.textSecondary,
-    textAlign: 'center',
+    marginTop: LAYOUT.spacing.md,
   },
 });
 

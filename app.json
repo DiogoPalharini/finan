@@ -18,7 +18,9 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.finan.app",
       "infoPlist": {
-        "UIBackgroundModes": ["remote-notification"]
+        "UIBackgroundModes": [
+          "remote-notification"
+        ]
       }
     },
     "android": {
@@ -27,7 +29,9 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.finan.app",
-      "permissions": ["NOTIFICATIONS"]
+      "permissions": [
+        "NOTIFICATIONS"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -38,9 +42,16 @@
         {
           "icon": "./assets/notification-icon.png",
           "color": "#ffffff",
-          "sounds": ["./assets/notification-sound.wav"]
+          "sounds": [
+            "./assets/notification-sound.wav"
+          ]
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "c5a875fa-2847-4ee4-9386-186cea7e7484"
+      }
+    }
   }
 }

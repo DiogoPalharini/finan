@@ -61,6 +61,7 @@ export interface Transaction {
   goalAllocation?: string;
   attachments?: string[];
   notes?: string;
+  receiptImageUri?: string;
   createdAt?: string;
   updatedAt?: string;
 }

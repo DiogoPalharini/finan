@@ -28,11 +28,11 @@ function RootLayoutContent() {
       setUser(authUser);
       
       // Redirecionar com base no estado de autenticação
-      const isAuthRoute = ['login', 'SignUpScreen'].includes(segments[0] || '');
+      const isAuthRoute = ['login', 'signup'].includes(segments[0] || '');
       
       if (!authUser && !isAuthRoute) {
         // Usuário não autenticado e não está em uma rota de autenticação
-        router.replace('/LoginScreen');
+        router.replace('/login');
       } else if (authUser && isAuthRoute) {
         // Usuário autenticado e está em uma rota de autenticação
         router.replace('/HomeScreen');
@@ -68,7 +68,7 @@ function RootLayoutContent() {
     }
   }, [isOpen]);
 
-  const isAuthScreen = ['LoginScreen', 'SignUpScreen'].includes(segments[0] || '');
+  const isAuthScreen = ['login', 'signup'].includes(segments[0] || '');
   
   const navigateTo = (path: string) => {
     closeDrawer();
@@ -81,7 +81,7 @@ function RootLayoutContent() {
     closeDrawer();
     try {
       await auth.signOut();
-      router.replace('/LoginScreen');
+      router.replace('/login');
     } catch (error) {
       console.error('Erro ao fazer logout:', error);
     }

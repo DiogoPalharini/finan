@@ -18,7 +18,7 @@ export default function IndexScreen() {
         router.replace('/HomeScreen');
       } else {
         // Usuário não autenticado, redirecionar para login
-        router.replace('/LoginScreen');
+        router.replace('/login');
       }
     });
 
@@ -30,12 +30,7 @@ export default function IndexScreen() {
   return (
     <View style={styles.container}>
       <ActivityIndicator size="large" color={COLORS.primary} />
-      <Text style={styles.balanceValue}>
-        {balance.toLocaleString('pt-BR', {
-          style: 'currency',
-          currency: 'BRL'
-        })}
-      </Text>
+      <Text style={styles.loadingText}>Carregando...</Text>
     </View>
   );
 }
@@ -47,9 +42,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: COLORS.background,
   },
-  balanceValue: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginTop: 20,
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: COLORS.textSecondary,
   },
 });

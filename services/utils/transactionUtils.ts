@@ -81,4 +81,19 @@ export function getTotalIncomesByMonth(transactions: Transaction[], year: number
   
   // Somar os valores
   return filteredIncomes.reduce((sum, income) => sum + income.amount, 0);
+}
+
+/**
+ * Valida se uma URI de imagem é válida
+ * Aceita URIs locais (file://) ou URLs (http/https)
+ */
+export function isValidImageUri(uri?: string): boolean {
+  if (!uri || typeof uri !== 'string') return false;
+  // Aceita file://, content://, http://, https://
+  return (
+    uri.startsWith('file://') ||
+    uri.startsWith('content://') ||
+    uri.startsWith('http://') ||
+    uri.startsWith('https://')
+  );
 } 

@@ -7,6 +7,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { COLORS } from '../src/styles/colors';
 import { useAuth } from '../hooks/useAuth';
 import { saveExpense, saveIncome } from '../services/transactionService';
+import ImagePicker from './ImagePicker';
 
 // Categorias de despesas
 const expenseCategories = [
@@ -48,6 +49,7 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({ visible, onCl
   const [descricao, setDescricao] = useState('');
   const [categoria, setCategoria] = useState('');
   const [data, setData] = useState(new Date());
+  const [receiptImageUri, setReceiptImageUri] = useState<string | undefined>();
   const [errors, setErrors] = useState<FormErrors>({});
   const [showDatePicker, setShowDatePicker] = useState(false);
 
@@ -115,6 +117,14 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({ visible, onCl
     validateField('categoria', cat);
   };
 
+  const handleImageSelected = (imageUri: string) => {
+    setReceiptImageUri(imageUri);
+  };
+
+  const handleImageRemoved = () => {
+    setReceiptImageUri(undefined);
+  };
+
   const handleSubmit = async () => {
     if (!user) return;
 
@@ -138,19 +148,22 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({ visible, onCl
         throw new Error('Valor inválido');
       }
 
+      const transactionData = {
+        amount: valorNumerico,
+        description: descricao.trim(),
+        date: data.toISOString(),
+        receiptImageUri: receiptImageUri,
+      };
+
       if (tipo === 'despesa') {
         await saveExpense(user.uid, {
-          amount: valorNumerico,
-          description: descricao.trim(),
+          ...transactionData,
           category: categoria,
-          date: data.toISOString()
         });
       } else {
         await saveIncome(user.uid, {
-          amount: valorNumerico,
-          description: descricao.trim(),
+          ...transactionData,
           source: categoria,
-          date: data.toISOString()
         });
       }
 
@@ -307,6 +320,17 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({ visible, onCl
                     {data.toLocaleDateString('pt-BR')}
                   </Text>
                 </TouchableOpacity>
+              </View>
+
+              {/* Foto do Recibo Card */}
+              <View style={styles.card}>
+                <ImagePicker
+                  onImageSelected={handleImageSelected}
+                  onImageRemoved={handleImageRemoved}
+                  currentImage={receiptImageUri}
+                  disabled={loading}
+                  label="Foto do recibo (opcional)"
+                />
               </View>
 
               {showDatePicker && (

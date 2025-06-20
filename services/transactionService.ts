@@ -27,6 +27,7 @@ export interface Transaction {
   goalAllocation?: string;
   attachments?: string[];
   notes?: string;
+  receiptImageUri?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -37,6 +38,7 @@ export interface Expense {
   description: string;
   category: string;
   date: string;
+  receiptImageUri?: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -47,6 +49,7 @@ export interface Income {
   description: string;
   source: string;
   date: string;
+  receiptImageUri?: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -458,7 +461,8 @@ export async function saveExpense(userId: string, expense: Omit<Expense, 'id' | 
       amount: expense.amount,
       description: expense.description,
       category: expense.category,
-      date: expense.date
+      date: expense.date,
+      receiptImageUri: expense.receiptImageUri,
     };
 
     console.log('saveExpense: Convertendo para transação:', transaction);
@@ -481,7 +485,8 @@ export async function saveIncome(userId: string, income: Omit<Income, 'id' | 'cr
       amount: income.amount,
       description: income.description,
       source: income.source,
-      date: income.date
+      date: income.date,
+      receiptImageUri: income.receiptImageUri,
     };
 
     console.log('saveIncome: Convertendo para transação:', transaction);
@@ -513,6 +518,7 @@ export async function getExpenses(userId: string): Promise<Expense[]> {
         description: transaction.description,
         category: transaction.category || '',
         date: transaction.date,
+        receiptImageUri: transaction.receiptImageUri,
         createdAt: transaction.createdAt,
         updatedAt: transaction.updatedAt
       }));
@@ -551,6 +557,7 @@ export async function getIncomes(userId: string): Promise<Income[]> {
         description: transaction.description,
         source: transaction.source || '',
         date: transaction.date,
+        receiptImageUri: transaction.receiptImageUri,
         createdAt: transaction.createdAt,
         updatedAt: transaction.updatedAt
       });
@@ -634,11 +641,11 @@ export async function addTransaction(userId: string, transaction: Omit<Transacti
     await set(newTransactionRef, newTransaction);
     
     // Se for uma despesa, atualizar os orçamentos
-    if (transaction.type === 'expense') {
+    if (transaction.type === 'expense' && transaction.category) {
       await updateBudgetsOnNewExpense(userId, transaction.category, transaction.amount);
     }
     
-    return newTransaction.id;
+    return newTransaction.id!;
   } catch (error) {
     console.error('Erro ao adicionar transação:', error);
     throw error;

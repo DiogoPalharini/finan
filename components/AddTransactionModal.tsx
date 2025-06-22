@@ -7,7 +7,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { COLORS } from '../src/styles/colors';
 import { useAuth } from '../hooks/useAuth';
 import { saveExpense, saveIncome } from '../services/transactionService';
-import ImagePicker from './ImagePicker';
+import ImagePickerComponent from './ImagePicker';
 
 // Categorias de despesas
 const expenseCategories = [
@@ -118,10 +118,12 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({ visible, onCl
   };
 
   const handleImageSelected = (imageUri: string) => {
+    console.log('AddTransactionModal - handleImageSelected chamado com:', imageUri);
     setReceiptImageUri(imageUri);
   };
 
   const handleImageRemoved = () => {
+    console.log('AddTransactionModal - handleImageRemoved chamado');
     setReceiptImageUri(undefined);
   };
 
@@ -148,12 +150,16 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({ visible, onCl
         throw new Error('Valor inválido');
       }
 
-      const transactionData = {
+      const transactionData: any = {
         amount: valorNumerico,
         description: descricao.trim(),
         date: data.toISOString(),
-        receiptImageUri: receiptImageUri,
       };
+
+      // Só incluir receiptImageUri se não for undefined
+      if (receiptImageUri) {
+        transactionData.receiptImageUri = receiptImageUri;
+      }
 
       if (tipo === 'despesa') {
         await saveExpense(user.uid, {
@@ -324,7 +330,7 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({ visible, onCl
 
               {/* Foto do Recibo Card */}
               <View style={styles.card}>
-                <ImagePicker
+                <ImagePickerComponent
                   onImageSelected={handleImageSelected}
                   onImageRemoved={handleImageRemoved}
                   currentImage={receiptImageUri}

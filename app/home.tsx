@@ -36,26 +36,15 @@ import {
   getTransactionsByCategory,
   getBalanceByMonth,
   getTransactions,
-  clearTransactionsCache
+  clearTransactionsCache,
+  deleteTransaction,
+  Transaction
 } from '../services/transactionService';
 import { processarRecorrencias } from '../services/recurringService';
-import { useAuth } from '../hooks/useAuth';
+import { useAuth } from '../contexts/useAuth';
 import { getUserBalance } from '../services/userService';
 
 // Tipos
-export interface Transaction {
-  id: string;
-  type: 'expense' | 'income' | 'transfer';
-  amount: number;
-  description: string;
-  category: string;
-  date: string;
-  userId: string;
-  createdAt: string;
-  updatedAt: string;
-  imageUri?: string;  // URI da imagem associada à transação
-}
-
 export interface CategoryItem {
   id: string;
   name: string;
@@ -375,6 +364,47 @@ const HomeScreen = () => {
     }
   };
 
+  // Funções para manipulação de imagens
+  const handleImageUpdate = async (transactionId: string, newImageUri: string) => {
+    try {
+      // Atualizar a transação no estado local
+      setTransactions(prevTransactions => 
+        prevTransactions.map(transaction => 
+          transaction.id === transactionId 
+            ? { ...transaction, receiptImageUri: newImageUri }
+            : transaction
+        )
+      );
+
+      // Atualizar no banco de dados (se necessário)
+      // Aqui você pode adicionar a lógica para salvar no Firebase ou outro banco
+      console.log('Imagem atualizada para transação:', transactionId);
+    } catch (error) {
+      console.error('Erro ao atualizar imagem:', error);
+      Alert.alert('Erro', 'Não foi possível atualizar a imagem');
+    }
+  };
+
+  const handleImageRemove = async (transactionId: string) => {
+    try {
+      // Remover a imagem da transação no estado local
+      setTransactions(prevTransactions => 
+        prevTransactions.map(transaction => 
+          transaction.id === transactionId 
+            ? { ...transaction, receiptImageUri: undefined }
+            : transaction
+        )
+      );
+
+      // Remover do banco de dados (se necessário)
+      // Aqui você pode adicionar a lógica para remover do Firebase ou outro banco
+      console.log('Imagem removida da transação:', transactionId);
+    } catch (error) {
+      console.error('Erro ao remover imagem:', error);
+      Alert.alert('Erro', 'Não foi possível remover a imagem');
+    }
+  };
+
   return (
     <View style={styles.container}>
       {/* Cabeçalho */}
@@ -460,7 +490,9 @@ const HomeScreen = () => {
             setEditingTransaction(transaction);
           }
         }}
-        onPressDelete={confirmDelete}
+        onPressDelete={(item: Transaction) => confirmDelete(item)}
+        onImageUpdate={handleImageUpdate}
+        onImageRemove={handleImageRemove}
         incomeSources={incomeSources}
         expenseCategories={expenseCategories}
       />

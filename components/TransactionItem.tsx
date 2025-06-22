@@ -14,6 +14,8 @@ interface TransactionItemProps {
   formatDate: (dateString: string) => string;
   onPress: () => void;
   onPressDelete: (item: Transaction) => void;
+  onImageUpdate?: (transactionId: string, newImageUri: string) => void;
+  onImageRemove?: (transactionId: string) => void;
   incomeSources: CategoryItem[];
   expenseCategories: CategoryItem[];
 }
@@ -24,10 +26,13 @@ const TransactionItem: React.FC<TransactionItemProps> = ({
   formatDate,
   onPress,
   onPressDelete,
+  onImageUpdate,
+  onImageRemove,
   incomeSources,
   expenseCategories
 }) => {
   const [imageViewerVisible, setImageViewerVisible] = useState(false);
+  const [currentImageUri, setCurrentImageUri] = useState<string | null>(item.receiptImageUri || null);
 
   const categoryName = item.type === 'income'
     ? incomeSources.find(s => s.id === item.source)?.name || 'Outros'
@@ -35,13 +40,28 @@ const TransactionItem: React.FC<TransactionItemProps> = ({
       ? expenseCategories.find(c => c.id === item.category)?.name || 'Outros'
       : 'Transferência';
 
-  const hasReceiptImage = item.receiptImageUri && item.receiptImageUri.trim() !== '';
+  const hasReceiptImage = currentImageUri && currentImageUri.trim() !== '';
 
   const handleImagePress = (e: any) => {
     e.stopPropagation();
     if (hasReceiptImage) {
       setImageViewerVisible(true);
     }
+  };
+
+  const handleImageUpdate = (newUri: string) => {
+    setCurrentImageUri(newUri);
+    if (onImageUpdate && item.id) {
+      onImageUpdate(item.id, newUri);
+    }
+  };
+
+  const handleImageRemove = () => {
+    setCurrentImageUri(undefined);
+    if (onImageRemove && item.id) {
+      onImageRemove(item.id);
+    }
+    setImageViewerVisible(false);
   };
 
   return (
@@ -129,8 +149,10 @@ const TransactionItem: React.FC<TransactionItemProps> = ({
       {hasReceiptImage && (
         <ImageViewerModal
           visible={imageViewerVisible}
-          imageUri={item.receiptImageUri!}
+          imageUri={currentImageUri!}
           onClose={() => setImageViewerVisible(false)}
+          onImageUpdate={handleImageUpdate}
+          onImageRemove={handleImageRemove}
         />
       )}
     </>

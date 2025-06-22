@@ -8,14 +8,10 @@ import {
   Modal,
   Dimensions,
 } from 'react-native';
-import { Text, ActivityIndicator, Surface } from 'react-native-paper';
+import { Text, ActivityIndicator } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
-import { useImagePicker } from '../hooks/useImagePicker';
-import { COLORS } from '../src/styles/colors';
-import { LAYOUT } from '../src/styles/layout';
-import { TYPO } from '../src/styles/typography';
-import { isValidImageUri } from '../services/utils/transactionUtils';
+import * as ImagePicker from 'expo-image-picker';
+import * as MediaLibrary from 'expo-media-library';
 
 const { width } = Dimensions.get('window');
 
@@ -27,32 +23,99 @@ interface ImagePickerProps {
   label?: string;
 }
 
-const ImagePicker: React.FC<ImagePickerProps> = ({
+const ImagePickerComponent: React.FC<ImagePickerProps> = ({
   onImageSelected,
   onImageRemoved,
   currentImage,
   disabled = false,
   label = 'Adicionar foto do recibo',
 }) => {
-  const { pickImage, takePhoto, isLoading } = useImagePicker();
+  const [isLoading, setIsLoading] = useState(false);
   const [showOptions, setShowOptions] = useState(false);
 
+  const requestPermissions = async (): Promise<boolean> => {
+    try {
+      const cameraPermission = await ImagePicker.requestCameraPermissionsAsync();
+      const mediaPermission = await MediaLibrary.requestPermissionsAsync();
+      
+      if (cameraPermission.status !== 'granted' || mediaPermission.status !== 'granted') {
+        Alert.alert('Permissão necessária', 'Precisamos de permissão para acessar a câmera e galeria');
+        return false;
+      }
+      return true;
+    } catch (error) {
+      console.error('Erro ao solicitar permissões:', error);
+      return false;
+    }
+  };
+
   const handleImageSelection = async (imageUri: string | null) => {
-    if (imageUri && isValidImageUri(imageUri)) {
+    console.log('handleImageSelection chamado com:', imageUri);
+    if (imageUri) {
+      console.log('URI válida, chamando onImageSelected');
       onImageSelected(imageUri);
+    } else {
+      console.log('URI nula');
     }
   };
 
   const handlePickFromGallery = async () => {
-    setShowOptions(false);
-    const imageUri = await pickImage();
-    await handleImageSelection(imageUri);
+    try {
+      console.log('handlePickFromGallery iniciado');
+      setShowOptions(false);
+      setIsLoading(true);
+      
+      const hasPermission = await requestPermissions();
+      if (!hasPermission) return;
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 1,
+      });
+
+      console.log('Resultado da seleção:', result);
+
+      if (!result.canceled && result.assets[0]) {
+        console.log('Imagem selecionada:', result.assets[0].uri);
+        await handleImageSelection(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Erro ao selecionar imagem:', error);
+      Alert.alert('Erro', 'Não foi possível selecionar a imagem');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleTakePhoto = async () => {
-    setShowOptions(false);
-    const imageUri = await takePhoto();
-    await handleImageSelection(imageUri);
+    try {
+      console.log('handleTakePhoto iniciado');
+      setShowOptions(false);
+      setIsLoading(true);
+      
+      const hasPermission = await requestPermissions();
+      if (!hasPermission) return;
+
+      const result = await ImagePicker.launchCameraAsync({
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 1,
+      });
+
+      console.log('Resultado da captura:', result);
+
+      if (!result.canceled && result.assets[0]) {
+        console.log('Foto capturada:', result.assets[0].uri);
+        await handleImageSelection(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Erro ao tirar foto:', error);
+      Alert.alert('Erro', 'Não foi possível tirar a foto');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleRemoveImage = () => {
@@ -71,11 +134,11 @@ const ImagePicker: React.FC<ImagePickerProps> = ({
     setShowOptions(true);
   };
 
-  if (currentImage && isValidImageUri(currentImage)) {
+  if (currentImage) {
     return (
       <View style={styles.container}>
         {label && <Text style={styles.label}>{label}</Text>}
-        <Surface style={styles.imageContainer} elevation={2}>
+        <View style={styles.imageContainer}>
           <Image source={{ uri: currentImage }} style={styles.image} />
           <TouchableOpacity
             style={styles.removeButton}
@@ -83,12 +146,9 @@ const ImagePicker: React.FC<ImagePickerProps> = ({
             disabled={disabled}
             activeOpacity={0.7}
           >
-            <LinearGradient
-              colors={[COLORS.danger, '#d32f2f']}
-              style={styles.removeButtonGradient}
-            >
-              <Ionicons name="close" size={16} color={COLORS.white} />
-            </LinearGradient>
+            <View style={styles.removeButtonBackground}>
+              <Ionicons name="close" size={16} color="white" />
+            </View>
           </TouchableOpacity>
           {!disabled && (
             <TouchableOpacity
@@ -96,15 +156,12 @@ const ImagePicker: React.FC<ImagePickerProps> = ({
               onPress={showImageOptions}
               activeOpacity={0.7}
             >
-              <LinearGradient
-                colors={[COLORS.primary, COLORS.secondary]}
-                style={styles.changeButtonGradient}
-              >
-                <Ionicons name="camera" size={16} color={COLORS.white} />
-              </LinearGradient>
+              <View style={styles.changeButtonBackground}>
+                <Ionicons name="camera" size={16} color="white" />
+              </View>
             </TouchableOpacity>
           )}
-        </Surface>
+        </View>
       </View>
     );
   }
@@ -119,11 +176,11 @@ const ImagePicker: React.FC<ImagePickerProps> = ({
         activeOpacity={0.7}
       >
         {isLoading ? (
-          <ActivityIndicator size="small" color={COLORS.primary} />
+          <ActivityIndicator size="small" color="#0052CC" />
         ) : (
           <>
             <View style={styles.iconContainer}>
-              <Ionicons name="camera-outline" size={24} color={COLORS.primary} />
+              <Ionicons name="camera-outline" size={24} color="#0052CC" />
             </View>
             <Text style={[styles.addButtonText, disabled && styles.disabledText]}>
               Adicionar foto
@@ -147,13 +204,10 @@ const ImagePicker: React.FC<ImagePickerProps> = ({
               onPress={handleTakePhoto}
               activeOpacity={0.7}
             >
-              <LinearGradient
-                colors={[COLORS.primary, COLORS.secondary]}
-                style={styles.optionButtonGradient}
-              >
-                <Ionicons name="camera" size={24} color={COLORS.white} />
+              <View style={styles.optionButtonBackground}>
+                <Ionicons name="camera" size={24} color="white" />
                 <Text style={styles.optionButtonText}>Tirar foto</Text>
-              </LinearGradient>
+              </View>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -161,13 +215,10 @@ const ImagePicker: React.FC<ImagePickerProps> = ({
               onPress={handlePickFromGallery}
               activeOpacity={0.7}
             >
-              <LinearGradient
-                colors={[COLORS.secondary, COLORS.primary]}
-                style={styles.optionButtonGradient}
-              >
-                <Ionicons name="images-outline" size={24} color={COLORS.white} />
+              <View style={styles.optionButtonBackground}>
+                <Ionicons name="images-outline" size={24} color="white" />
                 <Text style={styles.optionButtonText}>Escolher da galeria</Text>
-              </LinearGradient>
+              </View>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -186,47 +237,47 @@ const ImagePicker: React.FC<ImagePickerProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: LAYOUT.spacing.md,
+    marginBottom: 20,
   },
   label: {
-    fontSize: TYPO.size.sm,
-    fontFamily: TYPO.family.medium,
-    color: COLORS.text,
-    marginBottom: LAYOUT.spacing.sm,
+    fontSize: 14,
+    fontFamily: 'medium',
+    color: '#333',
+    marginBottom: 10,
   },
   addButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: COLORS.white,
+    backgroundColor: '#fff',
     borderWidth: 2,
-    borderColor: COLORS.divider,
+    borderColor: '#e0e0e0',
     borderStyle: 'dashed',
     borderRadius: 12,
-    paddingVertical: LAYOUT.spacing.lg,
-    paddingHorizontal: LAYOUT.spacing.md,
+    paddingVertical: 20,
+    paddingHorizontal: 20,
     minHeight: 80,
   },
   disabledButton: {
     opacity: 0.5,
-    borderColor: COLORS.textSecondary,
+    borderColor: '#ccc',
   },
   iconContainer: {
-    marginRight: LAYOUT.spacing.sm,
+    marginRight: 10,
   },
   addButtonText: {
-    fontSize: TYPO.size.md,
-    fontFamily: TYPO.family.medium,
-    color: COLORS.text,
+    fontSize: 16,
+    fontFamily: 'medium',
+    color: '#333',
   },
   disabledText: {
-    color: COLORS.textSecondary,
+    color: '#ccc',
   },
   imageContainer: {
     position: 'relative',
     borderRadius: 12,
     overflow: 'hidden',
-    backgroundColor: COLORS.white,
+    backgroundColor: '#fff',
   },
   image: {
     width: '100%',
@@ -235,29 +286,31 @@ const styles = StyleSheet.create({
   },
   removeButton: {
     position: 'absolute',
-    top: LAYOUT.spacing.sm,
-    right: LAYOUT.spacing.sm,
+    top: 10,
+    right: 10,
     zIndex: 10,
   },
-  removeButtonGradient: {
+  removeButtonBackground: {
     width: 32,
     height: 32,
     borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#D7263D',
   },
   changeButton: {
     position: 'absolute',
-    bottom: LAYOUT.spacing.sm,
-    right: LAYOUT.spacing.sm,
+    bottom: 10,
+    right: 10,
     zIndex: 10,
   },
-  changeButtonGradient: {
+  changeButtonBackground: {
     width: 40,
     height: 40,
     borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#0052CC',
   },
   modalOverlay: {
     flex: 1,
@@ -266,47 +319,48 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalContent: {
-    backgroundColor: COLORS.white,
+    backgroundColor: '#fff',
     borderRadius: 16,
-    padding: LAYOUT.spacing.lg,
+    padding: 20,
     width: width * 0.8,
     maxWidth: 300,
   },
   modalTitle: {
-    fontSize: TYPO.size.lg,
-    fontFamily: TYPO.family.bold,
-    color: COLORS.text,
+    fontSize: 18,
+    fontFamily: 'bold',
+    color: '#333',
     textAlign: 'center',
-    marginBottom: LAYOUT.spacing.lg,
+    marginBottom: 20,
   },
   optionButton: {
-    marginBottom: LAYOUT.spacing.md,
+    marginBottom: 10,
     borderRadius: 12,
     overflow: 'hidden',
   },
-  optionButtonGradient: {
+  optionButtonBackground: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: LAYOUT.spacing.md,
-    paddingHorizontal: LAYOUT.spacing.lg,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    backgroundColor: '#0052CC',
   },
   optionButtonText: {
-    fontSize: TYPO.size.md,
-    fontFamily: TYPO.family.medium,
-    color: COLORS.white,
-    marginLeft: LAYOUT.spacing.sm,
+    fontSize: 16,
+    fontFamily: 'medium',
+    color: '#fff',
+    marginLeft: 10,
   },
   cancelButton: {
-    marginTop: LAYOUT.spacing.sm,
-    paddingVertical: LAYOUT.spacing.sm,
+    marginTop: 10,
+    paddingVertical: 10,
     alignItems: 'center',
   },
   cancelButtonText: {
-    fontSize: TYPO.size.md,
-    fontFamily: TYPO.family.medium,
-    color: COLORS.textSecondary,
+    fontSize: 16,
+    fontFamily: 'medium',
+    color: '#ccc',
   },
 });
 
-export default ImagePicker; 
+export default ImagePickerComponent; 

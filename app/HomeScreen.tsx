@@ -36,36 +36,18 @@ import {
   getTransactionsByCategory,
   getBalanceByMonth,
   getTransactions,
-  clearTransactionsCache
+  clearTransactionsCache,
+  getTransactionsByType,
+  deleteTransaction,
+  Transaction,
+  updateIncome,
+  updateExpense
 } from '../services/transactionService';
 import { processarRecorrencias } from '../services/recurringService';
 import { useAuth } from '../hooks/useAuth';
 import { getUserBalance } from '../services/userService';
 
 // Tipos
-export interface Transaction {
-  id?: string;
-  type: 'income' | 'expense' | 'transfer';
-  description: string;
-  amount: number;
-  date: string;
-  category?: string;
-  source?: string;
-  paymentMethod?: string;
-  installments?: {
-    total: number;
-    current: number;
-  };
-  tags?: string[];
-  recurringId?: string;
-  goalAllocation?: string;
-  attachments?: string[];
-  notes?: string;
-  receiptImageUri?: string;
-  createdAt?: string;
-  updatedAt?: string;
-}
-
 export interface CategoryItem {
   id: string;
   name: string;
@@ -307,7 +289,9 @@ const HomeScreen = () => {
       // Fechar modal e recarregar transações
       setDeleteModalVisible(false);
       setItemToDelete(null);
-      loadTransactions();
+      
+      // Usar handleOperationSuccess para garantir atualização completa
+      await handleOperationSuccess();
       
       Alert.alert('Sucesso', 'Item excluído com sucesso!');
     } catch (error) {
@@ -365,23 +349,76 @@ const HomeScreen = () => {
 
   // Função para atualizar os dados após uma operação
   const handleOperationSuccess = async () => {
-    if (!user) return;
-    
-    setIsLoading(true);
     try {
-      // Limpar o cache de transações
-      await clearTransactionsCache(user.uid);
+      console.log('HomeScreen - handleOperationSuccess: Iniciando atualização dos dados');
       
-      // Recarregar saldo e transações
-      await loadUserBalance();
+      // Limpar cache primeiro
+      if (user) {
+        clearTransactionsCache(user.uid);
+        console.log('HomeScreen - handleOperationSuccess: Cache limpo');
+      }
+      
+      // Recarregar transações forçando atualização
       await loadTransactions();
+      console.log('HomeScreen - handleOperationSuccess: Transações recarregadas');
       
-      console.log('HomeScreen: Dados atualizados com sucesso após operação');
+      // Recarregar saldo
+      await loadUserBalance();
+      console.log('HomeScreen - handleOperationSuccess: Saldo recarregado');
+      
+      console.log('HomeScreen - handleOperationSuccess: Atualização concluída com sucesso');
     } catch (error) {
-      console.error('Erro ao atualizar dados:', error);
-      Alert.alert('Erro', 'Não foi possível atualizar os dados.');
-    } finally {
-      setIsLoading(false);
+      console.error('HomeScreen - handleOperationSuccess: Erro ao atualizar dados:', error);
+    }
+  };
+
+  const handleImageUpdate = async (transactionId: string, newImageUri: string) => {
+    try {
+      if (!user) return;
+      
+      const transaction = transactions.find(t => t.id === transactionId);
+      if (!transaction) return;
+
+      console.log('HomeScreen - handleImageUpdate: Atualizando imagem da transação:', transactionId);
+
+      if (transaction.type === 'income') {
+        await updateIncome(user.uid, transactionId, { receiptImageUri: newImageUri });
+      } else if (transaction.type === 'expense') {
+        await updateExpense(user.uid, transactionId, { receiptImageUri: newImageUri });
+      }
+      
+      // Limpar cache e recarregar
+      clearTransactionsCache(user.uid);
+      await loadTransactions();
+      console.log('HomeScreen - handleImageUpdate: Imagem atualizada com sucesso');
+    } catch (error) {
+      console.error('Erro ao atualizar imagem:', error);
+      Alert.alert('Erro', 'Não foi possível atualizar a imagem');
+    }
+  };
+
+  const handleImageRemove = async (transactionId: string) => {
+    try {
+      if (!user) return;
+      
+      const transaction = transactions.find(t => t.id === transactionId);
+      if (!transaction) return;
+
+      console.log('HomeScreen - handleImageRemove: Removendo imagem da transação:', transactionId);
+
+      if (transaction.type === 'income') {
+        await updateIncome(user.uid, transactionId, { receiptImageUri: undefined });
+      } else if (transaction.type === 'expense') {
+        await updateExpense(user.uid, transactionId, { receiptImageUri: undefined });
+      }
+      
+      // Limpar cache e recarregar
+      clearTransactionsCache(user.uid);
+      await loadTransactions();
+      console.log('HomeScreen - handleImageRemove: Imagem removida com sucesso');
+    } catch (error) {
+      console.error('Erro ao remover imagem:', error);
+      Alert.alert('Erro', 'Não foi possível remover a imagem');
     }
   };
 
@@ -471,6 +508,8 @@ const HomeScreen = () => {
           }
         }}
         onPressDelete={confirmDelete}
+        onImageUpdate={handleImageUpdate}
+        onImageRemove={handleImageRemove}
         incomeSources={incomeSources}
         expenseCategories={expenseCategories}
       />
@@ -489,7 +528,6 @@ const HomeScreen = () => {
         onClose={() => setDeleteModalVisible(false)}
         onConfirm={async () => {
           await handleDelete();
-          handleOperationSuccess();
         }}
         isLoading={isLoading}
         itemType={itemToDelete?.type || 'expense'}

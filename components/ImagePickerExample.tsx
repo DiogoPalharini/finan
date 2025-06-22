@@ -5,14 +5,39 @@ import ImagePicker from './ImagePicker';
 import { COLORS } from '../src/styles/colors';
 import { LAYOUT } from '../src/styles/layout';
 import { TYPO } from '../src/styles/typography';
+import * as ImageManipulator from 'expo-image-manipulator';
 
 const ImagePickerExample: React.FC = () => {
   const [selectedImage, setSelectedImage] = useState<string | undefined>();
 
-  const handleImageSelected = (imageUri: string) => {
-    console.log('Imagem selecionada:', imageUri);
-    setSelectedImage(imageUri);
-    Alert.alert('Sucesso', 'Imagem selecionada com sucesso!');
+  const handleImageSelected = async (uri: string) => {
+    try {
+      console.log('Imagem selecionada:', uri);
+      
+      // Testar o ImageManipulator diretamente
+      console.log('Testando ImageManipulator...');
+      const result = await ImageManipulator.manipulateAsync(
+        uri,
+        [
+          {
+            resize: {
+              width: 800,
+              height: 600,
+            },
+          },
+        ],
+        {
+          compress: 0.8,
+          format: ImageManipulator.SaveFormat.JPEG,
+        }
+      );
+      
+      console.log('ImageManipulator funcionou! Resultado:', result.uri);
+      setSelectedImage(result.uri);
+    } catch (error) {
+      console.error('Erro ao processar imagem:', error);
+      Alert.alert('Erro', 'Não foi possível processar a imagem');
+    }
   };
 
   const handleImageRemoved = () => {

@@ -58,6 +58,29 @@ export interface Income {
 let transactionsCache: { [userId: string]: { transactions: Transaction[], timestamp: number } } = {};
 const CACHE_DURATION = 30000; // 30 segundos
 
+// Função para remover valores undefined de um objeto
+function removeUndefinedValues(obj: any): any {
+  if (obj === null || obj === undefined) {
+    return obj;
+  }
+  
+  if (Array.isArray(obj)) {
+    return obj.map(removeUndefinedValues);
+  }
+  
+  if (typeof obj === 'object') {
+    const cleaned: any = {};
+    for (const [key, value] of Object.entries(obj)) {
+      if (value !== undefined) {
+        cleaned[key] = removeUndefinedValues(value);
+      }
+    }
+    return cleaned;
+  }
+  
+  return obj;
+}
+
 /**
  * Salva uma nova transação (despesa ou receita)
  * @param userId ID do usuário
@@ -81,7 +104,10 @@ export async function saveTransaction(userId: string, transaction: Omit<Transact
       updatedAt: now
     };
     
-    console.log('saveTransaction: Transação completa:', JSON.stringify(completeTransaction, null, 2));
+    // Limpar valores undefined antes de salvar
+    const cleanedTransaction = removeUndefinedValues(completeTransaction);
+    
+    console.log('saveTransaction: Transação limpa:', JSON.stringify(cleanedTransaction, null, 2));
     
     // Atualizar saldo e salvar transação em paralelo
     let amountChange = 0;
@@ -107,7 +133,7 @@ export async function saveTransaction(userId: string, transaction: Omit<Transact
       console.log('saveTransaction: Novo saldo:', newBalance);
       
       await Promise.all([
-        set(newTransactionRef, completeTransaction),
+        set(newTransactionRef, cleanedTransaction),
         update(userRef, {
           totalBalance: newBalance,
           updatedAt: now
@@ -115,7 +141,7 @@ export async function saveTransaction(userId: string, transaction: Omit<Transact
       ]);
     } else {
       // Se for transferência, apenas salvar a transação
-      await set(newTransactionRef, completeTransaction);
+      await set(newTransactionRef, cleanedTransaction);
     }
 
     console.log('saveTransaction: Transação salva no banco de dados');
@@ -183,6 +209,12 @@ export async function getTransactions(userId: string, forceRefresh = false): Pro
     snapshot.forEach((childSnapshot) => {
       const transaction = childSnapshot.val() as Transaction;
       transaction.id = childSnapshot.key;
+      
+      // Converter campos null para undefined
+      if (transaction.receiptImageUri === null) {
+        transaction.receiptImageUri = undefined;
+      }
+      
       transactions.push(transaction);
     });
     
@@ -295,6 +327,9 @@ export async function getTransactionsByCategory(userId: string, type: 'expense' 
  */
 export async function updateTransaction(userId: string, transactionId: string, updates: Partial<Transaction>): Promise<void> {
   try {
+    console.log('updateTransaction: Iniciando atualização');
+    console.log('updateTransaction: Updates recebidos:', updates);
+    
     const transactionRef = ref(rtdb, `users/${userId}/transactions/${transactionId}`);
     const snapshot = await get(transactionRef);
     
@@ -303,6 +338,7 @@ export async function updateTransaction(userId: string, transactionId: string, u
     }
     
     const oldTransaction = snapshot.val() as Transaction;
+    console.log('updateTransaction: Transação atual:', oldTransaction);
     
     // Se o valor ou tipo mudou, atualizar o saldo do usuário
     if (updates.amount !== undefined || updates.type !== undefined) {
@@ -317,11 +353,34 @@ export async function updateTransaction(userId: string, transactionId: string, u
       }
     }
     
-    // Atualizar a transação
-    await update(transactionRef, {
-      ...updates,
+    // Preparar updates para o Firebase
+    const firebaseUpdates: any = {
       updatedAt: new Date().toISOString()
+    };
+    
+    // Adicionar campos que não são undefined
+    Object.entries(updates).forEach(([key, value]) => {
+      if (value !== undefined) {
+        firebaseUpdates[key] = value;
+      }
     });
+    
+    // Se receiptImageUri está sendo definido como undefined, remover o campo
+    if (updates.hasOwnProperty('receiptImageUri') && updates.receiptImageUri === undefined) {
+      console.log('updateTransaction: Removendo campo receiptImageUri');
+      // Para remover um campo no Firebase, definimos como null
+      firebaseUpdates.receiptImageUri = null;
+    }
+    
+    console.log('updateTransaction: Updates para Firebase:', firebaseUpdates);
+    
+    // Atualizar a transação
+    await update(transactionRef, firebaseUpdates);
+    console.log('updateTransaction: Transação atualizada com sucesso');
+    
+    // Limpar o cache para forçar uma nova busca
+    delete transactionsCache[userId];
+    console.log('updateTransaction: Cache limpo para forçar atualização');
   } catch (error) {
     console.error('Erro ao atualizar transação:', error);
     throw error;
@@ -331,13 +390,16 @@ export async function updateTransaction(userId: string, transactionId: string, u
 export async function updateExpense(userId: string, expenseId: string, expenseData: Partial<Expense>): Promise<void> {
   try {
     console.log('updateExpense: Iniciando atualização de despesa');
+    console.log('updateExpense: Dados recebidos:', expenseData);
     
     const transaction: Partial<Transaction> = {
       type: 'expense',
-      amount: expenseData.amount,
-      description: expenseData.description,
-      category: expenseData.category,
-      date: expenseData.date,
+      ...(expenseData.amount !== undefined && { amount: expenseData.amount }),
+      ...(expenseData.description !== undefined && { description: expenseData.description }),
+      ...(expenseData.category !== undefined && { category: expenseData.category }),
+      ...(expenseData.date !== undefined && { date: expenseData.date }),
+      // Sempre incluir receiptImageUri se estiver presente nos dados
+      ...(expenseData.hasOwnProperty('receiptImageUri') && { receiptImageUri: expenseData.receiptImageUri }),
       updatedAt: new Date().toISOString()
     };
 
@@ -353,13 +415,16 @@ export async function updateExpense(userId: string, expenseId: string, expenseDa
 export async function updateIncome(userId: string, incomeId: string, incomeData: Partial<Income>): Promise<void> {
   try {
     console.log('updateIncome: Iniciando atualização de receita');
+    console.log('updateIncome: Dados recebidos:', incomeData);
     
     const transaction: Partial<Transaction> = {
       type: 'income',
-      amount: incomeData.amount,
-      description: incomeData.description,
-      source: incomeData.source,
-      date: incomeData.date,
+      ...(incomeData.amount !== undefined && { amount: incomeData.amount }),
+      ...(incomeData.description !== undefined && { description: incomeData.description }),
+      ...(incomeData.source !== undefined && { source: incomeData.source }),
+      ...(incomeData.date !== undefined && { date: incomeData.date }),
+      // Sempre incluir receiptImageUri se estiver presente nos dados
+      ...(incomeData.hasOwnProperty('receiptImageUri') && { receiptImageUri: incomeData.receiptImageUri }),
       updatedAt: new Date().toISOString()
     };
 
@@ -462,7 +527,8 @@ export async function saveExpense(userId: string, expense: Omit<Expense, 'id' | 
       description: expense.description,
       category: expense.category,
       date: expense.date,
-      receiptImageUri: expense.receiptImageUri,
+      // Só incluir receiptImageUri se não for undefined
+      ...(expense.receiptImageUri && { receiptImageUri: expense.receiptImageUri }),
     };
 
     console.log('saveExpense: Convertendo para transação:', transaction);
@@ -486,7 +552,8 @@ export async function saveIncome(userId: string, income: Omit<Income, 'id' | 'cr
       description: income.description,
       source: income.source,
       date: income.date,
-      receiptImageUri: income.receiptImageUri,
+      // Só incluir receiptImageUri se não for undefined
+      ...(income.receiptImageUri && { receiptImageUri: income.receiptImageUri }),
     };
 
     console.log('saveIncome: Convertendo para transação:', transaction);
@@ -518,7 +585,7 @@ export async function getExpenses(userId: string): Promise<Expense[]> {
         description: transaction.description,
         category: transaction.category || '',
         date: transaction.date,
-        receiptImageUri: transaction.receiptImageUri,
+        receiptImageUri: transaction.receiptImageUri === null ? undefined : transaction.receiptImageUri,
         createdAt: transaction.createdAt,
         updatedAt: transaction.updatedAt
       }));
@@ -557,7 +624,7 @@ export async function getIncomes(userId: string): Promise<Income[]> {
         description: transaction.description,
         source: transaction.source || '',
         date: transaction.date,
-        receiptImageUri: transaction.receiptImageUri,
+        receiptImageUri: transaction.receiptImageUri === null ? undefined : transaction.receiptImageUri,
         createdAt: transaction.createdAt,
         updatedAt: transaction.updatedAt
       });
@@ -588,6 +655,10 @@ export async function deleteExpense(userId: string, expenseId: string): Promise<
     
     // Excluir a despesa
     await remove(expenseRef);
+    
+    // Limpar o cache para forçar uma nova busca
+    delete transactionsCache[userId];
+    console.log('deleteExpense: Cache limpo para forçar atualização');
   } catch (error) {
     console.error('Erro ao excluir despesa:', error);
     throw error;
@@ -611,6 +682,10 @@ export async function deleteIncome(userId: string, incomeId: string): Promise<vo
     
     // Excluir a receita
     await remove(incomeRef);
+    
+    // Limpar o cache para forçar uma nova busca
+    delete transactionsCache[userId];
+    console.log('deleteIncome: Cache limpo para forçar atualização');
   } catch (error) {
     console.error('Erro ao excluir receita:', error);
     throw error;

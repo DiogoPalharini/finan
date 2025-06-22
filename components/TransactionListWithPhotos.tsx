@@ -1,115 +1,162 @@
-import React from 'react';
-import { View, StyleSheet, ScrollView, Text } from 'react-native';
+import React, { useState } from 'react';
+import { View, StyleSheet, Alert } from 'react-native';
+import { Text, Button } from 'react-native-paper';
 import { COLORS } from '../src/styles/colors';
-import { LAYOUT } from '../src/styles/layout';
 import { TYPO } from '../src/styles/typography';
-import TransactionItem from './TransactionItem';
+import { LAYOUT } from '../src/styles/layout';
+import TransactionList from './TransactionList';
 import { Transaction, CategoryItem } from '../app/HomeScreen';
 
 const TransactionListWithPhotos: React.FC = () => {
-  // Dados de exemplo
-  const incomeSources: CategoryItem[] = [
-    { id: '1', name: 'Salário', icon: 'cash-outline' },
-    { id: '2', name: 'Freelance', icon: 'briefcase-outline' },
-    { id: '3', name: 'Investimentos', icon: 'trending-up-outline' },
-  ];
-
-  const expenseCategories: CategoryItem[] = [
-    { id: '1', name: 'Alimentação', icon: 'restaurant-outline' },
-    { id: '2', name: 'Transporte', icon: 'car-outline' },
-    { id: '3', name: 'Lazer', icon: 'film-outline' },
-  ];
-
-  const exampleTransactions: Transaction[] = [
+  const [transactions, setTransactions] = useState<Transaction[]>([
     {
       id: '1',
       type: 'expense',
-      amount: 45.50,
+      amount: 50.00,
       description: 'Almoço no restaurante',
-      category: '1',
+      category: 'alimentacao',
       date: '2024-01-15',
-      receiptImageUri: 'https://via.placeholder.com/400x600/FF5722/FFFFFF?text=Recibo+Almoço',
+      receiptImageUri: 'file:///path/to/receipt1.jpg',
+      createdAt: '2024-01-15T10:00:00Z',
+      updatedAt: '2024-01-15T10:00:00Z',
     },
     {
       id: '2',
       type: 'income',
-      amount: 2500.00,
-      description: 'Salário mensal',
-      source: '1',
+      amount: 2000.00,
+      description: 'Salário',
+      source: 'salario',
       date: '2024-01-10',
-      receiptImageUri: 'https://via.placeholder.com/400x600/4CAF50/FFFFFF?text=Comprovante+Salário',
+      receiptImageUri: 'file:///path/to/receipt2.jpg',
+      createdAt: '2024-01-10T08:00:00Z',
+      updatedAt: '2024-01-10T08:00:00Z',
     },
     {
       id: '3',
       type: 'expense',
-      amount: 120.00,
+      amount: 30.00,
       description: 'Combustível',
-      category: '2',
+      category: 'transporte',
       date: '2024-01-12',
-      // Sem foto
+      // Sem imagem
+      createdAt: '2024-01-12T14:30:00Z',
+      updatedAt: '2024-01-12T14:30:00Z',
     },
-    {
-      id: '4',
-      type: 'expense',
-      amount: 89.90,
-      description: 'Cinema e pipoca',
-      category: '3',
-      date: '2024-01-14',
-      receiptImageUri: 'https://via.placeholder.com/400x600/FF9800/FFFFFF?text=Ingresso+Cinema',
-    },
-    {
-      id: '5',
-      type: 'income',
-      amount: 500.00,
-      description: 'Freelance design',
-      source: '2',
-      date: '2024-01-08',
-      receiptImageUri: 'https://via.placeholder.com/400x600/2196F3/FFFFFF?text=Comprovante+Freelance',
-    },
+  ]);
+
+  const incomeSources: CategoryItem[] = [
+    { id: 'salario', name: 'Salário', icon: 'cash-outline' },
+    { id: 'investimentos', name: 'Investimentos', icon: 'trending-up-outline' },
+    { id: 'freelance', name: 'Freelance', icon: 'briefcase-outline' },
   ];
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
+  const expenseCategories: CategoryItem[] = [
+    { id: 'alimentacao', name: 'Alimentação', icon: 'restaurant-outline' },
+    { id: 'transporte', name: 'Transporte', icon: 'car-outline' },
+    { id: 'moradia', name: 'Moradia', icon: 'home-outline' },
+  ];
+
+  const formatCurrency = (value: number): string => {
+    return value.toLocaleString('pt-BR', {
       style: 'currency',
       currency: 'BRL',
-    }).format(value);
+    });
   };
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string): string => {
     const date = new Date(dateString);
     return date.toLocaleDateString('pt-BR');
   };
 
-  const handlePressItem = (transaction: Transaction) => {
-    console.log('Transação selecionada:', transaction);
+  // Função para atualizar imagem de uma transação
+  const handleImageUpdate = (transactionId: string, newImageUri: string) => {
+    console.log('Atualizando imagem da transação:', transactionId, 'para:', newImageUri);
+    
+    setTransactions(prevTransactions => 
+      prevTransactions.map(transaction => 
+        transaction.id === transactionId 
+          ? { ...transaction, receiptImageUri: newImageUri }
+          : transaction
+      )
+    );
+    
+    Alert.alert('Sucesso', 'Imagem atualizada com sucesso!');
   };
 
-  const handlePressDelete = (transaction: Transaction) => {
-    console.log('Deletar transação:', transaction);
+  // Função para remover imagem de uma transação
+  const handleImageRemove = (transactionId: string) => {
+    console.log('Removendo imagem da transação:', transactionId);
+    
+    setTransactions(prevTransactions => 
+      prevTransactions.map(transaction => 
+        transaction.id === transactionId 
+          ? { ...transaction, receiptImageUri: undefined }
+          : transaction
+      )
+    );
+    
+    Alert.alert('Sucesso', 'Imagem removida com sucesso!');
+  };
+
+  // Função para deletar uma transação
+  const handleDeleteTransaction = (transaction: Transaction) => {
+    Alert.alert(
+      'Confirmar exclusão',
+      `Tem certeza que deseja excluir "${transaction.description}"?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Excluir',
+          style: 'destructive',
+          onPress: () => {
+            setTransactions(prevTransactions => 
+              prevTransactions.filter(t => t.id !== transaction.id)
+            );
+            Alert.alert('Sucesso', 'Transação excluída com sucesso!');
+          }
+        }
+      ]
+    );
+  };
+
+  // Função para editar uma transação
+  const handleEditTransaction = (transaction: Transaction) => {
+    Alert.alert('Editar Transação', `Editando: ${transaction.description}`);
+    // Aqui você implementaria a lógica para abrir o modal de edição
   };
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Lista de Transações com Fotos</Text>
-        <Text style={styles.subtitle}>
-          Toque no ícone da câmera para visualizar a foto do recibo
+    <View style={styles.container}>
+      <Text style={styles.title}>Lista de Transações com Fotos</Text>
+      <Text style={styles.subtitle}>
+        Toque no ícone da câmera para ver, editar, compartilhar ou remover fotos
+      </Text>
+      
+      <TransactionList
+        isLoading={false}
+        transactions={transactions}
+        formatCurrency={formatCurrency}
+        formatDate={formatDate}
+        onPressItem={handleEditTransaction}
+        onPressDelete={handleDeleteTransaction}
+        onImageUpdate={handleImageUpdate}
+        onImageRemove={handleImageRemove}
+        incomeSources={incomeSources}
+        expenseCategories={expenseCategories}
+      />
+      
+      <View style={styles.infoContainer}>
+        <Text style={styles.infoText}>
+          • Transações com ícone de câmera têm fotos de recibo
+        </Text>
+        <Text style={styles.infoText}>
+          • Toque no ícone para visualizar em tela cheia
+        </Text>
+        <Text style={styles.infoText}>
+          • Use os botões para compartilhar, salvar, editar ou remover
         </Text>
       </View>
-
-      {exampleTransactions.map((transaction) => (
-        <TransactionItem
-          key={transaction.id}
-          item={transaction}
-          formatCurrency={formatCurrency}
-          formatDate={formatDate}
-          onPress={() => handlePressItem(transaction)}
-          onPressDelete={() => handlePressDelete(transaction)}
-          incomeSources={incomeSources}
-          expenseCategories={expenseCategories}
-        />
-      ))}
-    </ScrollView>
+    </View>
   );
 };
 
@@ -117,11 +164,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
-  },
-  header: {
-    padding: LAYOUT.spacing.lg,
-    backgroundColor: COLORS.surface,
-    marginBottom: LAYOUT.spacing.md,
+    padding: LAYOUT.spacing.md,
   },
   title: {
     fontSize: TYPO.size.xl,
@@ -130,10 +173,22 @@ const styles = StyleSheet.create({
     marginBottom: LAYOUT.spacing.sm,
   },
   subtitle: {
-    fontSize: TYPO.size.md,
+    fontSize: TYPO.size.sm,
     fontFamily: TYPO.family.regular,
     color: COLORS.textSecondary,
-    lineHeight: 20,
+    marginBottom: LAYOUT.spacing.lg,
+  },
+  infoContainer: {
+    backgroundColor: COLORS.surface,
+    padding: LAYOUT.spacing.md,
+    borderRadius: LAYOUT.radius.medium,
+    marginTop: LAYOUT.spacing.md,
+  },
+  infoText: {
+    fontSize: TYPO.size.sm,
+    fontFamily: TYPO.family.regular,
+    color: COLORS.textSecondary,
+    marginBottom: LAYOUT.spacing.xs,
   },
 });
 

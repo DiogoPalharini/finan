@@ -15,6 +15,8 @@ interface TransactionListProps {
   formatDate: (dateString: string) => string;
   onPressItem: (transaction: Transaction) => void;
   onPressDelete: (item: Transaction) => void;
+  onImageUpdate?: (transactionId: string, newImageUri: string) => void;
+  onImageRemove?: (transactionId: string) => void;
   incomeSources: CategoryItem[];
   expenseCategories: CategoryItem[];
 }
@@ -26,6 +28,8 @@ const TransactionList: React.FC<TransactionListProps> = ({
   formatDate,
   onPressItem,
   onPressDelete,
+  onImageUpdate,
+  onImageRemove,
   incomeSources,
   expenseCategories
 }) => {
@@ -60,6 +64,8 @@ const TransactionList: React.FC<TransactionListProps> = ({
           formatDate={formatDate}
           onPress={() => onPressItem(item)}
           onPressDelete={() => onPressDelete(item)}
+          onImageUpdate={onImageUpdate}
+          onImageRemove={onImageRemove}
           incomeSources={incomeSources}
           expenseCategories={expenseCategories}
         />

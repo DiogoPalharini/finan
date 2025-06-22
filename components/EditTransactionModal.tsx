@@ -1,14 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, View, StyleSheet, TouchableOpacity, ScrollView, TextInput, KeyboardAvoidingView, Platform, Alert } from 'react-native';
-import { Text } from 'react-native-paper';
-import { Ionicons } from '@expo/vector-icons';
+import {
+  Modal,
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+} from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { useAuth } from '../contexts/useAuth';
+import { updateExpense, updateIncome, Transaction } from '../services/transactionService';
 import { COLORS } from '../src/styles/colors';
-import { useAuth } from '../hooks/useAuth';
-import { updateExpense, updateIncome } from '../services/transactionService';
-import { Transaction } from '../app/HomeScreen';
-import ImagePicker from './ImagePicker';
+import { TYPO } from '../src/styles/typography';
+import { LAYOUT } from '../src/styles/layout';
+import ImagePickerComponent from './ImagePicker';
 
 // Categorias de despesas
 const expenseCategories = [
@@ -133,6 +144,7 @@ const EditTransactionModal: React.FC<EditTransactionModalProps> = ({ visible, on
   };
 
   const handleImageRemoved = () => {
+    console.log('EditTransactionModal - handleImageRemoved chamado');
     setReceiptImageUri(undefined);
   };
 
@@ -159,12 +171,14 @@ const EditTransactionModal: React.FC<EditTransactionModalProps> = ({ visible, on
         throw new Error('Valor inválido');
       }
 
-      const transactionData = {
+      const transactionData: any = {
         amount: valorNumerico,
         description: descricao.trim(),
         date: data.toISOString(),
-        receiptImageUri: receiptImageUri,
+        receiptImageUri: receiptImageUri, // Sempre incluir, mesmo se undefined
       };
+
+      console.log('EditTransactionModal - Dados para atualização:', transactionData);
 
       if (transaction.type === 'income') {
         await updateIncome(user.uid, transaction.id!, {
@@ -304,7 +318,7 @@ const EditTransactionModal: React.FC<EditTransactionModalProps> = ({ visible, on
 
               {/* Foto do Recibo Card */}
               <View style={styles.card}>
-                <ImagePicker
+                <ImagePickerComponent
                   onImageSelected={handleImageSelected}
                   onImageRemoved={handleImageRemoved}
                   currentImage={receiptImageUri}

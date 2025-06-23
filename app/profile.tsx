@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Animated, Modal, TextInput, Platform, Alert } from 'react-native';
 import { Text, Button, Avatar, Divider, ActivityIndicator } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,6 +12,11 @@ import { TYPO } from '../src/styles/typography';
 import { useAuth } from '../hooks/useAuth';
 import { getUserProfile, getProfileStats, UserProfile, saveUserProfile } from '../services/userService';
 import EditProfileModal from '../components/EditProfileModal';
+import AvatarComponent from '../components/Avatar';
+import ProfilePhotoModal from '../components/ProfilePhotoModal';
+import ImageViewerModal from '../components/ImageViewerModal';
+import FeedbackToast from '../components/FeedbackToast';
+import { useProfileImage } from '../hooks/useProfileImage';
 
 const { width } = Dimensions.get('window');
 
@@ -29,6 +34,42 @@ const ProfileScreen = () => {
     label: string;
   } | null>(null);
   
+  // Estados para foto de perfil
+  const [photoModalVisible, setPhotoModalVisible] = useState(false);
+  const [imageViewerVisible, setImageViewerVisible] = useState(false);
+  const [feedbackToast, setFeedbackToast] = useState<{
+    visible: boolean;
+    message: string;
+    type: 'success' | 'error' | 'info' | 'loading';
+  }>({
+    visible: false,
+    message: '',
+    type: 'info',
+  });
+
+  // Hook para gerenciamento de foto de perfil
+  const {
+    photoURL,
+    isLoading: photoLoading,
+    isUploading: photoUploading,
+    updatePhoto,
+    updatePhotoFromUri,
+    takePhoto,
+    selectFromGallery,
+    removePhoto,
+    getAvatar,
+    refreshPhoto,
+    hasPhoto,
+    photoError,
+    clearError,
+  } = useProfileImage();
+
+  // Debug: log do photoURL
+  console.log('Profile - photoURL:', photoURL);
+  console.log('Profile - photoLoading:', photoLoading);
+  console.log('Profile - photoUploading:', photoUploading);
+  console.log('Profile - hasPhoto:', hasPhoto);
+
   // Animações
   const [animation] = useState({
     opacity: new Animated.Value(0),
@@ -74,6 +115,20 @@ const ProfileScreen = () => {
     ]).start();
   }, []);
 
+  // Mostrar feedback toast
+  const showFeedback = (message: string, type: 'success' | 'error' | 'info' | 'loading') => {
+    setFeedbackToast({
+      visible: true,
+      message,
+      type,
+    });
+  };
+
+  // Esconder feedback toast
+  const hideFeedback = () => {
+    setFeedbackToast(prev => ({ ...prev, visible: false }));
+  };
+
   // Obter as iniciais do nome ou email do usuário
   const getUserInitials = () => {
     if (user?.displayName) {
@@ -92,7 +147,7 @@ const ProfileScreen = () => {
   };
 
   // Obter o nome de exibição do usuário
-  const getDisplayName = () => {
+  const getDisplayName = useMemo(() => {
     if (user?.displayName) {
       return user.displayName;
     }
@@ -107,6 +162,54 @@ const ProfileScreen = () => {
     }
     
     return 'Convidado';
+  }, [user?.displayName, user?.email, profileData?.displayName]);
+
+  // Handlers para foto de perfil
+  const handlePhotoPress = () => {
+    setPhotoModalVisible(true);
+  };
+
+  const handleTakePhoto = async () => {
+    try {
+      console.log('Iniciando processo de tirar foto...');
+      showFeedback('Abrindo câmera...', 'loading');
+      await takePhoto();
+      console.log('Foto tirada com sucesso');
+      showFeedback('Foto atualizada com sucesso!', 'success');
+    } catch (error) {
+      console.error('Erro ao tirar foto:', error);
+      showFeedback('Erro ao tirar foto. Tente novamente.', 'error');
+    }
+  };
+
+  const handleChooseFromGallery = async () => {
+    try {
+      console.log('Iniciando processo de escolher da galeria...');
+      showFeedback('Abrindo galeria...', 'loading');
+      await selectFromGallery();
+      console.log('Foto escolhida com sucesso');
+      showFeedback('Foto atualizada com sucesso!', 'success');
+    } catch (error) {
+      console.error('Erro ao escolher foto:', error);
+      showFeedback('Erro ao escolher foto. Tente novamente.', 'error');
+    }
+  };
+
+  const handleRemovePhoto = async () => {
+    try {
+      showFeedback('Removendo foto...', 'loading');
+      await removePhoto();
+      showFeedback('Foto removida com sucesso!', 'success');
+    } catch (error) {
+      console.error('Erro ao remover foto:', error);
+      showFeedback('Erro ao remover foto. Tente novamente.', 'error');
+    }
+  };
+
+  const handleViewPhoto = () => {
+    if (photoURL) {
+      setImageViewerVisible(true);
+    }
   };
 
   const handleLogout = async () => {
@@ -201,24 +304,6 @@ const ProfileScreen = () => {
       await saveUserProfile(user.uid, updates);
       await loadProfileData();
       
-      // Configurar notificações locais se ativadas
-      if (updates.notificationPreference === 'diaria') {
-        await Notifications.scheduleNotificationAsync({
-          content: {
-            title: 'Finan - Resumo Diário',
-            body: 'Confira seu resumo financeiro do dia!',
-            data: { type: 'daily_summary' },
-          },
-          trigger: {
-            type: 'timeInterval',
-            seconds: 24 * 60 * 60, // 24 horas
-            repeats: true,
-          },
-        });
-      } else {
-        await Notifications.cancelAllScheduledNotificationsAsync();
-      }
-      
       Alert.alert(
         'Sucesso',
         updates.notificationPreference === 'diaria' 
@@ -283,261 +368,250 @@ const ProfileScreen = () => {
   }
 
   return (
-    <ScrollView 
-      style={styles.container} 
-      showsVerticalScrollIndicator={false}
-      contentContainerStyle={styles.contentContainer}
-    >
-      {/* Cabeçalho com gradiente */}
-      <LinearGradient
-        colors={[COLORS.secondary, COLORS.primary]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.header}
+    <View style={styles.container}>
+      <ScrollView 
+        style={styles.scrollView} 
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.contentContainer}
       >
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => router.back()}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="arrow-back" size={22} color={COLORS.white} />
-        </TouchableOpacity>
-        
-        <View style={styles.profileHeader}>
-          <TouchableOpacity style={styles.avatarContainer} activeOpacity={0.9}>
-            <Avatar.Text
-              size={80}
-              label={getUserInitials()}
-              style={styles.avatar}
-              labelStyle={styles.avatarLabel}
-            />
-            <View style={styles.avatarBadge}>
-              <Ionicons name="camera" size={14} color={COLORS.white} />
-            </View>
-          </TouchableOpacity>
-          
-          <Text style={styles.userName}>{getDisplayName()}</Text>
-          <Text style={styles.userEmail} numberOfLines={1} ellipsizeMode="middle">
-            {user.email}
-          </Text>
-          
-          <TouchableOpacity 
-            style={styles.editButton} 
-            activeOpacity={0.8}
-            onPress={handleEditProfile}
-          >
-            <Ionicons name="pencil-outline" size={16} color={COLORS.white} />
-            <Text style={styles.editButtonText}>Editar perfil</Text>
-          </TouchableOpacity>
-        </View>
-      </LinearGradient>
-
-      {/* Estatísticas do usuário */}
-      <Animated.View 
-        style={[
-          styles.statsContainer,
-          {
-            opacity: animation.opacity,
-            transform: [{ translateY: animation.translateY }]
-          }
-        ]}
-      >
-        <View style={styles.statCard}>
-          <Text style={styles.statValue}>{profileStats.goalCount}</Text>
-          <Text style={styles.statLabel}>Metas</Text>
-        </View>
-        
-        <View style={styles.statDivider} />
-        
-        <View style={styles.statCard}>
-          <Text style={styles.statValue}>{profileStats.savingsRate}%</Text>
-          <Text style={styles.statLabel}>Economia</Text>
-        </View>
-        
-        <View style={styles.statDivider} />
-        
-        <View style={styles.statCard}>
-          <Text style={styles.statValue}>{profileStats.monthsActive}</Text>
-          <Text style={styles.statLabel}>Meses</Text>
-        </View>
-      </Animated.View>
-
-      {/* Seção de informações pessoais */}
-      <Animated.View
-        style={[
-          styles.section,
-          {
-            opacity: animation.opacity,
-            transform: [{ 
-              translateY: Animated.multiply(animation.translateY, 1.2) 
-            }]
-          }
-        ]}
-      >
-        <Text style={styles.sectionTitle}>Informações pessoais</Text>
-        
-        <View style={styles.infoCard}>
-          <ProfileInfoItem 
-            icon="person-outline" 
-            label="Nome" 
-            value={profileData?.displayName || user.displayName || 'Não definido'} 
-            isEditable={true}
-            onEdit={() => handleEditField('displayName', profileData?.displayName || '', 'Nome')}
-          />
-          
-          <Divider style={styles.itemDivider} />
-          
-          <ProfileInfoItem 
-            icon="mail-outline" 
-            label="Email" 
-            value={user.email || 'Não definido'} 
-          />
-          
-          <Divider style={styles.itemDivider} />
-          
-          <ProfileInfoItem 
-            icon="call-outline" 
-            label="Telefone" 
-            value={profileData?.phoneNumber || 'Não definido'} 
-          />
-          
-          <Divider style={styles.itemDivider} />
-          
-          <ProfileInfoItem 
-            icon="calendar-outline" 
-            label="Data de nascimento" 
-            value={profileData?.birthDate || 'Não definido'} 
-          />
-          
-          {profileData?.cpf && (
-            <>
-              <Divider style={styles.itemDivider} />
-              <ProfileInfoItem 
-                icon="card-outline" 
-                label="CPF" 
-                value={profileData.cpf} 
-                isSecure={true}
-              />
-            </>
-          )}
-        </View>
-      </Animated.View>
-
-      {/* Seção de informações financeiras */}
-      <Animated.View
-        style={[
-          styles.section,
-          {
-            opacity: animation.opacity,
-            transform: [{ 
-              translateY: Animated.multiply(animation.translateY, 1.3) 
-            }]
-          }
-        ]}
-      >
-        <Text style={styles.sectionTitle}>Informações financeiras</Text>
-        
-        <View style={styles.infoCard}>
-          <ProfileInfoItem 
-            icon="briefcase-outline" 
-            label="Profissão" 
-            value={profileData?.profession || 'Não definido'} 
-          />
-          
-          <Divider style={styles.itemDivider} />
-          
-          <ProfileInfoItem 
-            icon="business-outline" 
-            label="Situação" 
-            value={formatEmploymentStatus(profileData?.employmentStatus)} 
-          />
-          
-          <Divider style={styles.itemDivider} />
-          
-          <ProfileInfoItem 
-            icon="cash-outline" 
-            label="Renda mensal" 
-            value={formatMonthlyIncome(profileData?.monthlyIncome)} 
-          />
-          
-          <Divider style={styles.itemDivider} />
-          
-          <ProfileInfoItem 
-            icon="trending-up-outline" 
-            label="Objetivo" 
-            value={formatFinancialGoal(profileData?.financialGoal)} 
-          />
-        </View>
-      </Animated.View>
-
-      {/* Seção de preferências */}
-      <Animated.View
-        style={[
-          styles.section,
-          {
-            opacity: animation.opacity,
-            transform: [{ 
-              translateY: Animated.multiply(animation.translateY, 1.4) 
-            }]
-          }
-        ]}
-      >
-        <Text style={styles.sectionTitle}>Preferências</Text>
-        
-        <View style={styles.infoCard}>
-          <ProfileInfoItem 
-            icon="notifications-outline" 
-            label="Notificações" 
-            value={profileData?.notificationPreference === 'nenhuma' ? 'Desativadas' : 'Ativadas'} 
-            showToggle={true}
-            isEnabled={profileData?.notificationPreference !== 'nenhuma'}
-            onEdit={handleNotificationToggle}
-          />
-          
-          <Divider style={styles.itemDivider} />
-          
-          <ProfileInfoItem 
-            icon="globe-outline" 
-            label="Moeda" 
-            value={profileData?.preferredCurrency || 'BRL (R$)'} 
-          />
-        </View>
-      </Animated.View>
-
-      {/* Botão de logout */}
-      <Animated.View
-        style={{
-          opacity: animation.opacity,
-          transform: [{ 
-            translateY: Animated.multiply(animation.translateY, 1.6) 
-          }]
-        }}
-      >
+        {/* Cabeçalho com gradiente */}
         <LinearGradient
-          colors={['rgba(215, 38, 61, 0.1)', 'rgba(215, 38, 61, 0.05)']}
+          colors={[COLORS.secondary, COLORS.primary]}
           start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={styles.logoutButtonContainer}
+          end={{ x: 1, y: 1 }}
+          style={styles.header}
         >
-          <Button 
-            mode="outlined" 
-            icon="log-out-outline"
+          <TouchableOpacity 
+            style={styles.backButton}
+            onPress={() => router.back()}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="arrow-back" size={22} color={COLORS.white} />
+          </TouchableOpacity>
+          
+          <View style={styles.profileHeader}>
+            {/* Avatar com foto de perfil */}
+            <TouchableOpacity 
+              style={styles.avatarContainer} 
+              activeOpacity={0.9}
+              onPress={handlePhotoPress}
+            >
+              <AvatarComponent
+                size="large"
+                imageUri={photoURL || undefined}
+                userName={getDisplayName}
+                loading={photoLoading || photoUploading}
+                showEditIcon={true}
+                onPress={handlePhotoPress}
+                style={styles.avatar}
+              />
+            </TouchableOpacity>
+            
+            <Text style={styles.userName}>{getDisplayName}</Text>
+            <Text style={styles.userEmail} numberOfLines={1} ellipsizeMode="middle">
+              {user.email}
+            </Text>
+            
+            <TouchableOpacity 
+              style={styles.editButton} 
+              activeOpacity={0.8}
+              onPress={handleEditProfile}
+            >
+              <Ionicons name="pencil-outline" size={16} color={COLORS.white} />
+              <Text style={styles.editButtonText}>Editar perfil</Text>
+            </TouchableOpacity>
+          </View>
+        </LinearGradient>
+
+        {/* Estatísticas do usuário */}
+        <Animated.View 
+          style={[
+            styles.statsContainer,
+            {
+              opacity: animation.opacity,
+              transform: [{ translateY: animation.translateY }]
+            }
+          ]}
+        >
+          <View style={styles.statCard}>
+            <Text style={styles.statValue}>{profileStats.goalCount}</Text>
+            <Text style={styles.statLabel}>Metas</Text>
+          </View>
+          
+          <View style={styles.statDivider} />
+          
+          <View style={styles.statCard}>
+            <Text style={styles.statValue}>{profileStats.savingsRate}%</Text>
+            <Text style={styles.statLabel}>Economia</Text>
+          </View>
+          
+          <View style={styles.statDivider} />
+          
+          <View style={styles.statCard}>
+            <Text style={styles.statValue}>{profileStats.monthsActive}</Text>
+            <Text style={styles.statLabel}>Meses</Text>
+          </View>
+        </Animated.View>
+
+        {/* Seção de informações pessoais */}
+        <Animated.View
+          style={[
+            styles.section,
+            {
+              opacity: animation.opacity,
+              transform: [{ 
+                translateY: Animated.multiply(animation.translateY, 1.2) 
+              }]
+            }
+          ]}
+        >
+          <Text style={styles.sectionTitle}>Informações pessoais</Text>
+          
+          <View style={styles.infoCard}>
+            <ProfileInfoItem 
+              icon="person-outline" 
+              label="Nome" 
+              value={profileData?.displayName || user.displayName || 'Não definido'} 
+              isEditable={true}
+              onEdit={() => handleEditField('displayName', profileData?.displayName || '', 'Nome')}
+            />
+            
+            <Divider style={styles.itemDivider} />
+            
+            <ProfileInfoItem 
+              icon="mail-outline" 
+              label="Email" 
+              value={user.email || 'Não definido'} 
+            />
+            
+            <Divider style={styles.itemDivider} />
+            
+            <ProfileInfoItem 
+              icon="call-outline" 
+              label="Telefone" 
+              value={profileData?.phoneNumber || 'Não definido'} 
+              isEditable={true}
+              onEdit={() => handleEditField('phoneNumber', profileData?.phoneNumber || '', 'Telefone')}
+            />
+            
+            <Divider style={styles.itemDivider} />
+            
+            <ProfileInfoItem 
+              icon="calendar-outline" 
+              label="Data de nascimento" 
+              value={profileData?.birthDate || 'Não definido'} 
+              isEditable={true}
+              onEdit={() => handleEditField('birthDate', profileData?.birthDate || '', 'Data de nascimento')}
+            />
+          </View>
+        </Animated.View>
+
+        {/* Seção de informações financeiras */}
+        <Animated.View
+          style={[
+            styles.section,
+            {
+              opacity: animation.opacity,
+              transform: [{ 
+                translateY: Animated.multiply(animation.translateY, 1.4) 
+              }]
+            }
+          ]}
+        >
+          <Text style={styles.sectionTitle}>Informações financeiras</Text>
+          
+          <View style={styles.infoCard}>
+            <ProfileInfoItem 
+              icon="cash-outline" 
+              label="Renda mensal" 
+              value={formatMonthlyIncome(profileData?.monthlyIncome)} 
+              isEditable={true}
+              onEdit={() => handleEditField('monthlyIncome', profileData?.monthlyIncome || '', 'Renda mensal')}
+            />
+            
+            <Divider style={styles.itemDivider} />
+            
+            <ProfileInfoItem 
+              icon="flag-outline" 
+              label="Objetivo financeiro" 
+              value={formatFinancialGoal(profileData?.financialGoal)} 
+              isEditable={true}
+              onEdit={() => handleEditField('financialGoal', profileData?.financialGoal || '', 'Objetivo financeiro')}
+            />
+            
+            <Divider style={styles.itemDivider} />
+            
+            <ProfileInfoItem 
+              icon="briefcase-outline" 
+              label="Situação de emprego" 
+              value={formatEmploymentStatus(profileData?.employmentStatus)} 
+              isEditable={true}
+              onEdit={() => handleEditField('employmentStatus', profileData?.employmentStatus || '', 'Situação de emprego')}
+            />
+          </View>
+        </Animated.View>
+
+        {/* Seção de configurações */}
+        <Animated.View
+          style={[
+            styles.section,
+            {
+              opacity: animation.opacity,
+              transform: [{ 
+                translateY: Animated.multiply(animation.translateY, 1.6) 
+              }]
+            }
+          ]}
+        >
+          <Text style={styles.sectionTitle}>Configurações</Text>
+          
+          <View style={styles.infoCard}>
+            <ProfileInfoItem 
+              icon="notifications-outline" 
+              label="Notificações" 
+              value={profileData?.notificationPreference === 'diaria' ? 'Ativadas' : 'Desativadas'} 
+              showToggle={true}
+              isEnabled={profileData?.notificationPreference === 'diaria'}
+              onEdit={handleNotificationToggle}
+            />
+            
+            <Divider style={styles.itemDivider} />
+            
+            <ProfileInfoItem 
+              icon="shield-outline" 
+              label="Privacidade" 
+              value="Configurações de privacidade" 
+              onEdit={() => Alert.alert('Privacidade', 'Configurações de privacidade em desenvolvimento')}
+            />
+          </View>
+        </Animated.View>
+
+        {/* Botão de logout */}
+        <Animated.View
+          style={[
+            styles.logoutContainer,
+            {
+              opacity: animation.opacity,
+              transform: [{ 
+                translateY: Animated.multiply(animation.translateY, 1.8) 
+              }]
+            }
+          ]}
+        >
+          <Button
+            mode="outlined"
             onPress={handleLogout}
             loading={isLoading}
             disabled={isLoading}
             style={styles.logoutButton}
-            contentStyle={styles.logoutButtonContent}
-            labelStyle={styles.logoutButtonLabel}
+            labelStyle={styles.logoutButtonText}
+            icon="logout"
           >
             Sair da conta
           </Button>
-        </LinearGradient>
-      </Animated.View>
-      
-      <View style={styles.versionContainer}>
-        <Text style={styles.versionText}>Finan v1.0.0</Text>
-      </View>
-      
+        </Animated.View>
+      </ScrollView>
+
       {/* Modal de edição de perfil */}
       <EditProfileModal
         visible={editModalVisible}
@@ -546,45 +620,33 @@ const ProfileScreen = () => {
         currentProfile={profileData}
       />
 
-      <Modal
-        visible={!!editField}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setEditField(null)}
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Editar {editField?.label}</Text>
-            
-            <TextInput
-              style={styles.modalInput}
-              value={editField?.value}
-              onChangeText={(text) => setEditField(prev => prev ? {...prev, value: text} : null)}
-              placeholder={`Digite seu ${editField?.label.toLowerCase()}`}
-            />
-            
-            <View style={styles.modalButtons}>
-              <Button
-                mode="outlined"
-                onPress={() => setEditField(null)}
-                style={styles.modalButton}
-              >
-                Cancelar
-              </Button>
-              
-              <Button
-                mode="contained"
-                onPress={() => handleSaveField(editField?.value || '')}
-                loading={isLoading}
-                style={styles.modalButton}
-              >
-                Salvar
-              </Button>
-            </View>
-          </View>
-        </View>
-      </Modal>
-    </ScrollView>
+      {/* Modal de opções de foto */}
+      <ProfilePhotoModal
+        visible={photoModalVisible}
+        onClose={() => setPhotoModalVisible(false)}
+        onTakePhoto={handleTakePhoto}
+        onChooseFromGallery={handleChooseFromGallery}
+        onRemovePhoto={handleRemovePhoto}
+        onViewPhoto={handleViewPhoto}
+        hasPhoto={hasPhoto}
+      />
+
+      {/* Modal de visualização de imagem */}
+      <ImageViewerModal
+        visible={imageViewerVisible}
+        imageUri={photoURL || ''}
+        onClose={() => setImageViewerVisible(false)}
+      />
+
+      {/* Feedback toast */}
+      <FeedbackToast
+        visible={feedbackToast.visible}
+        message={feedbackToast.message}
+        type={feedbackToast.type}
+        onHide={hideFeedback}
+        duration={feedbackToast.type === 'loading' ? 0 : 3000}
+      />
+    </View>
   );
 };
 
@@ -681,6 +743,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
   },
+  scrollView: {
+    flex: 1,
+  },
   contentContainer: {
     paddingBottom: LAYOUT.spacing.xl,
   },
@@ -726,9 +791,7 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   avatar: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.4)',
+    // backgroundColor: 'rgba(255, 255, 255, 0.2)', // Removido para não ter fundo
   },
   avatarLabel: {
     fontSize: 32,
@@ -881,7 +944,7 @@ const styles = StyleSheet.create({
   toggleCircleActive: {
     alignSelf: 'flex-end',
   },
-  logoutButtonContainer: {
+  logoutContainer: {
     marginHorizontal: LAYOUT.spacing.lg,
     marginTop: LAYOUT.spacing.xl,
     borderRadius: 12,
@@ -890,10 +953,7 @@ const styles = StyleSheet.create({
     borderColor: COLORS.danger,
     borderRadius: 12,
   },
-  logoutButtonContent: {
-    height: 50,
-  },
-  logoutButtonLabel: {
+  logoutButtonText: {
     color: COLORS.danger,
     fontFamily: TYPO.family.medium,
     fontSize: TYPO.size.md,

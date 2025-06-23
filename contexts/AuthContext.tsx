@@ -1,5 +1,5 @@
 // contexts/AuthContext.tsx
-import React, { createContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User } from 'firebase/auth';
 import { auth } from '../config/firebaseConfig';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -20,6 +20,8 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   error: string | null;
+  photoURL: string | null;
+  setPhotoURL: (url: string | null | ((prev: string | null) => string | null)) => void;
   signUp: (email: string, password: string, displayName?: string) => Promise<User | null>;
   login: (email: string, password: string) => Promise<User | null>;
   logout: () => Promise<void>;
@@ -36,6 +38,8 @@ export const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
   error: null,
+  photoURL: null,
+  setPhotoURL: () => {},
   signUp: async () => null,
   login: async () => null,
   logout: async () => {},
@@ -57,12 +61,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [photoURL, setPhotoURL] = useState<string | null>(null);
 
   // Monitorar mudanças no estado de autenticação
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       setLoading(false);
+      
+      // Atualizar photoURL quando o usuário mudar
+      if (currentUser?.photoURL) {
+        setPhotoURL(currentUser.photoURL);
+      } else {
+        setPhotoURL(null);
+      }
     });
 
     // Limpar o listener quando o componente for desmontado
@@ -71,6 +83,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   // Limpar erro
   const clearError = () => setError(null);
+
+  // Função para atualizar photoURL
+  const updatePhotoURL = (url: string | null | ((prev: string | null) => string | null)) => {
+    if (typeof url === 'function') {
+      setPhotoURL(url);
+    } else {
+      setPhotoURL(url);
+    }
+  };
 
   // Função para cadastro
   const handleSignUp = async (email: string, password: string, displayName?: string) => {
@@ -195,6 +216,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     user,
     loading,
     error,
+    photoURL,
+    setPhotoURL: updatePhotoURL,
     signUp: handleSignUp,
     login: handleLogin,
     logout: handleLogout,
@@ -207,4 +230,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+};
+
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
 };

@@ -1,12 +1,14 @@
 import React, { useEffect, useRef } from 'react';
 import { View, StyleSheet, TouchableOpacity, Animated } from 'react-native';
-import { Text, Avatar } from 'react-native-paper';
+import { Text } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import type { User } from 'firebase/auth';
 import { COLORS } from '../../src/styles/colors';
 import { LAYOUT } from '../../src/styles/layout';
 import { TYPO } from '../../src/styles/typography';
+import AvatarComponent from '../Avatar';
+import { useProfileImage } from '../../hooks/useProfileImage';
 
 interface ProfileHeaderProps {
   user?: User | null;
@@ -19,6 +21,13 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
   onProfilePress,
   onClose
 }) => {
+  // Hook para gerenciamento de foto de perfil
+  const { photoURL, isLoading: photoLoading } = useProfileImage();
+
+  // Debug: log do photoURL no ProfileHeader
+  console.log('ProfileHeader - photoURL:', photoURL);
+  console.log('ProfileHeader - photoLoading:', photoLoading);
+
   // Animações
   const slideAnim = useRef(new Animated.Value(-50)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
@@ -38,23 +47,6 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
       })
     ]).start();
   }, []);
-
-  // Obter as iniciais do nome ou email do usuário
-  const getUserInitials = () => {
-    if (user?.displayName) {
-      const nameParts = user.displayName.split(' ');
-      if (nameParts.length > 1) {
-        return `${nameParts[0][0]}${nameParts[1][0]}`.toUpperCase();
-      }
-      return user.displayName[0].toUpperCase();
-    }
-    
-    if (user?.email) {
-      return user.email[0].toUpperCase();
-    }
-    
-    return '?';
-  };
 
   // Obter o nome de exibição do usuário
   const getDisplayName = () => {
@@ -101,15 +93,15 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
           activeOpacity={0.9}
           style={styles.avatarContainer}
         >
-          <Avatar.Text
-            size={70}
-            label={getUserInitials()}
+          <AvatarComponent
+            size="large"
+            imageUri={photoURL || undefined}
+            userName={getDisplayName()}
+            loading={photoLoading}
+            showEditIcon={true}
+            onPress={onProfilePress}
             style={styles.avatar}
-            labelStyle={styles.avatarLabel}
           />
-          <View style={styles.avatarBadge}>
-            <Ionicons name="camera" size={14} color={COLORS.white} />
-          </View>
         </TouchableOpacity>
         
         <View style={styles.userInfo}>
@@ -169,26 +161,7 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   avatar: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.4)',
-  },
-  avatarLabel: {
-    fontSize: 26,
-    fontFamily: TYPO.family.bold,
-  },
-  avatarBadge: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    backgroundColor: COLORS.primary,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: COLORS.white,
+    // backgroundColor: 'rgba(255, 255, 255, 0.2)', // Removido para não ter fundo
   },
   userInfo: {
     marginLeft: LAYOUT.spacing.md,

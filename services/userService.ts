@@ -26,6 +26,8 @@ export interface UserProfile {
   notificationPreference?: 'diaria' | 'semanal' | 'mensal' | 'nenhuma';
   totalBalance: number;
   pushToken?: string;
+  photoURL?: string;
+  photoUpdatedAt?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -114,7 +116,7 @@ export async function updateUserBalance(userId: string, amount: number): Promise
         id: userId,
         displayName: '',
         email: '',
-        totalBalance: amount,
+        totalBalance: 0,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
@@ -191,6 +193,7 @@ export async function getUserBalance(userId: string): Promise<number> {
       console.log('getUserBalance: Perfil não encontrado, criando perfil inicial');
       // Criar perfil inicial com saldo zero
       const initialProfile: UserProfile = {
+        id: userId,
         displayName: '',
         email: '',
         totalBalance: 0,

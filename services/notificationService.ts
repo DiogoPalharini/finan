@@ -1,6 +1,8 @@
 // services/notificationService.ts
 import { rtdb } from '../config/firebaseConfig';
 import { ref, push, set, get, update, remove, query, orderByChild, equalTo } from 'firebase/database';
+import * as Notifications from 'expo-notifications';
+import { Platform } from 'react-native';
 
 // Interface para notificações
 export interface Notification {
@@ -249,4 +251,88 @@ export async function createGoalDeadlineNotification(
     relatedId: goalId,
     priority: daysLeft <= 7 ? 'high' : 'medium'
   });
+}
+
+/**
+ * Solicita permissão para notificações ao usuário
+ * @returns true se permitido, false caso contrário
+ */
+export async function requestNotificationPermission(): Promise<boolean> {
+  const { status } = await Notifications.getPermissionsAsync();
+  if (status !== 'granted') {
+    const { status: newStatus } = await Notifications.requestPermissionsAsync();
+    return newStatus === 'granted';
+  }
+  return true;
+}
+
+/**
+ * Dispara uma notificação local de teste imediatamente
+ */
+export async function sendTestNotification() {
+  try {
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: 'Notificação de Teste',
+        body: 'Se você está vendo isso, as notificações locais estão funcionando!',
+        sound: true,
+        priority: Notifications.AndroidNotificationPriority.HIGH,
+      },
+      trigger: null,
+    });
+    console.log('sendTestNotification: Notificação de teste disparada');
+  } catch (e) {
+    console.error('sendTestNotification: Erro ao disparar notificação de teste:', e);
+  }
+}
+
+/**
+ * Agenda uma notificação local para uma recorrência
+ * @param recorrencia Recorrencia
+ */
+export async function scheduleRecurringNotification(recorrencia: {
+  descricao: string;
+  diaRecorrencia: number;
+  valor: number;
+}) {
+  try {
+    const now = new Date();
+    const localDay = now.getDate();
+    console.log('scheduleRecurringNotification: now (local)', now);
+    console.log('scheduleRecurringNotification: recorrencia', recorrencia);
+    // Notificação para hoje, se for o dia da recorrência (horário local)
+    if (localDay === recorrencia.diaRecorrencia) {
+      console.log('scheduleRecurringNotification: Disparando notificação IMEDIATA');
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: 'Recorrência para hoje!',
+          body: `Você tem uma recorrência: ${recorrencia.descricao} de R$ ${recorrencia.valor.toFixed(2)}`,
+          sound: true,
+          priority: Notifications.AndroidNotificationPriority.HIGH,
+        },
+        trigger: null, // dispara imediatamente
+      });
+    } else {
+      console.log('scheduleRecurringNotification: Não é o dia da recorrência, não dispara notificação imediata');
+    }
+    // Agenda para o próximo mês (horário local, 9h)
+    const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, recorrencia.diaRecorrencia, 9, 0, 0, 0);
+    console.log('scheduleRecurringNotification: Agendando para o próximo mês em', nextMonth);
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: 'Recorrência mensal',
+        body: `Você tem uma recorrência para hoje: ${recorrencia.descricao} de R$ ${recorrencia.valor.toFixed(2)}`,
+        sound: true,
+        priority: Notifications.AndroidNotificationPriority.HIGH,
+      },
+      trigger: {
+        date: nextMonth,
+        type: 'date',
+        repeats: false,
+      } as any,
+    });
+    console.log('scheduleRecurringNotification: Notificação agendada para o próximo mês');
+  } catch (e) {
+    console.error('Erro ao agendar/disparar notificação local:', e);
+  }
 }

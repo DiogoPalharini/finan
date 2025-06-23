@@ -5,6 +5,7 @@ import { saveTransaction, Transaction } from './transactionService';
 import { updateBudgetSpent } from './budgetService';
 import { createRecurringTransactionNotification } from './notificationService';
 import { calculateAndSaveMonthlyStatistics } from './statisticsService';
+import { scheduleRecurringNotification } from './notificationService';
 
 // Interface para recorrências
 export interface Recorrencia {
@@ -79,6 +80,13 @@ export async function saveRecorrencia(userId: string, recorrencia: Omit<Recorren
     } else {
       console.log('saveRecorrencia: Data de início não é hoje, transação será criada no dia correto');
     }
+
+    // Disparar/agendar notificação local para recorrência
+    await scheduleRecurringNotification({
+      descricao: recorrencia.descricao,
+      diaRecorrencia: recorrencia.diaRecorrencia,
+      valor: recorrencia.valor,
+    });
 
     return newRecorrenciaRef.key!;
   } catch (error) {
